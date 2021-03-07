@@ -168,7 +168,7 @@ func guildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
 				}
 
 				if len(messages) < 100 {
-					lit.Info("Finished getting messages for #%s in \"%s\"", c.Name, g.Name)
+					lit.Debug("Finished getting messages for #%s in \"%s\"", c.Name, g.Name)
 					break
 				}
 			}
@@ -185,7 +185,7 @@ func guildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
 	_ = db.QueryRow("SELECT offset FROM config WHERE guildID=?", g.ID).Scan(&offset)
 	if offset != 0 {
 		server[g.ID].numberOfMessages += offset
-		lit.Info("Added offset of %d on guild \"%s\". New total of message %d", offset, g.Name, server[g.ID].numberOfMessages)
+		lit.Debug("Added offset of %d on guild \"%s\". New total of message %d", offset, g.Name, server[g.ID].numberOfMessages)
 	}
 }
 

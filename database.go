@@ -242,9 +242,8 @@ func loadScheduler(s *discordgo.Session) {
 		return
 	}
 
-	var guildID, channelID, channelToID string
-
 	for config.Next() {
+		var guildID, channelID, channelToID string
 		err = config.Scan(&guildID, &channelID, &channelToID)
 		if err != nil {
 			lit.Error("Can't scan config, %s", err)
@@ -254,15 +253,12 @@ func loadScheduler(s *discordgo.Session) {
 		// Send random message from a channel every monday at midnight
 		_, _ = cron.Every(1).Monday().At("00:00:00").Do(func() {
 			var (
-				messageJSON    string
-				message        discordgo.Message
-				err            error
-				lclGuildID     = guildID
-				lclChannelID   = channelID
-				lclChannelToID = channelToID
+				messageJSON string
+				message     discordgo.Message
+				err         error
 			)
 
-			err = db.QueryRow("SELECT message FROM messages WHERE guildID=? AND channelID=? ORDER BY RAND() LIMIT 1", lclGuildID, lclChannelID).Scan(&messageJSON)
+			err = db.QueryRow("SELECT message FROM messages WHERE guildID=? AND channelID=? ORDER BY RAND() LIMIT 1", guildID, channelID).Scan(&messageJSON)
 			if err != nil {
 				lit.Error("Can't get random message, %s", err)
 				return
@@ -274,12 +270,14 @@ func loadScheduler(s *discordgo.Session) {
 				return
 			}
 
-			_, err = s.ChannelMessageSend(lclChannelToID, "Quote of the week:```\n"+message.Content+"```Submitted by "+message.Author.Username)
+			_, err = s.ChannelMessageSend(channelToID, "Quote of the week:```\n"+message.Content+"```Submitted by "+message.Author.Username)
 			if err != nil {
 				lit.Error("Can't send message, %s", err)
 				return
 			}
 		})
+
+		lit.Debug("Added cronjob for server %s", guildID)
 	}
 
 	// And start the scheduler

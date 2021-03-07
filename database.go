@@ -274,7 +274,7 @@ func loadScheduler(s *discordgo.Session) {
 				return
 			}
 
-			_, err = s.ChannelMessageSend(lclChannelToID, "Quote of the day:```\n"+message.Content+"```Submitted by "+message.Author.Username)
+			_, err = s.ChannelMessageSend(lclChannelToID, "Quote of the week:```\n"+message.Content+"```Submitted by "+message.Author.Username)
 			if err != nil {
 				lit.Error("Can't send message, %s", err)
 				return

@@ -2,10 +2,10 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
 	"github.com/go-co-op/gocron"
+	jsoniter "github.com/json-iterator/go"
 	"strings"
 	"time"
 )
@@ -37,7 +37,7 @@ func execQuery(query string) {
 func addMessage(m *discordgo.Message) {
 	stm, _ := db.Prepare("INSERT INTO messages (guildID, channelID, messageID, message) VALUES (?, ?, ?, ?)")
 
-	inJSON, _ := json.Marshal(m)
+	inJSON, _ := jsoniter.ConfigFastest.Marshal(m)
 
 	_, err := stm.Exec(m.GuildID, m.ChannelID, m.ID, string(inJSON))
 	if err != nil {
@@ -64,7 +64,7 @@ func deleteMessage(s *discordgo.Session, m *discordgo.Message) {
 	)
 
 	_ = db.QueryRow("SELECT message FROM messages WHERE guildID=? AND channelID=? AND messageID=?", m.GuildID, m.ChannelID, m.ID).Scan(&message)
-	_ = json.Unmarshal([]byte(message), &oldMessage)
+	_ = jsoniter.ConfigFastest.Unmarshal([]byte(message), &oldMessage)
 
 	now := time.Now()
 
@@ -103,10 +103,10 @@ func updateMessage(s *discordgo.Session, m *discordgo.Message) {
 	)
 
 	_ = db.QueryRow("SELECT message FROM messages WHERE guildID=? AND channelID=? AND messageID=?", m.GuildID, m.ChannelID, m.ID).Scan(&message)
-	_ = json.Unmarshal([]byte(message), &oldMessage)
+	_ = jsoniter.ConfigFastest.Unmarshal([]byte(message), &oldMessage)
 
 	// Update existing message
-	jsonMessage, _ := json.Marshal(m)
+	jsonMessage, _ := jsoniter.ConfigFastest.Marshal(m)
 
 	stm, _ := db.Prepare("UPDATE messages SET message=? WHERE guildID=? AND channelID=? AND messageID=?")
 	_, err := stm.Exec(string(jsonMessage), m.GuildID, m.ChannelID, m.ID)
@@ -264,7 +264,7 @@ func loadScheduler(s *discordgo.Session) {
 				return
 			}
 
-			err = json.Unmarshal([]byte(messageJSON), &message)
+			err = jsoniter.ConfigFastest.Unmarshal([]byte(messageJSON), &message)
 			if err != nil {
 				lit.Error("Can't unmarshall message, %s", err)
 				return

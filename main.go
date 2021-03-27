@@ -95,12 +95,21 @@ func main() {
 		return
 	}
 
+	// Add events handler
 	dg.AddHandler(messageCreate)
 	dg.AddHandler(messageDelete)
 	dg.AddHandler(messageUpdate)
 	dg.AddHandler(guildCreate)
 	dg.AddHandler(ready)
 
+	// Add commands handler
+	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		if h, ok := commandHandlers[i.Data.Name]; ok {
+			h(s, i)
+		}
+	})
+
+	// Initialize intents that we use
 	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuildMessages | discordgo.IntentsGuilds)
 
 	// Open a websocket connection to Discord and begin listening.

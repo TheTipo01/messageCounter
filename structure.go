@@ -4,3 +4,8 @@ package main
 type Server struct {
 	numberOfMessages int
 }
+
+type kv struct {
+	Key   string
+	Value int
+}

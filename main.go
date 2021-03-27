@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 	"syscall"
 )
@@ -19,6 +20,8 @@ var (
 	db *sql.DB
 	// Server structure for all the things we need (currently only the number of messages)
 	server = make(map[string]*Server)
+	// Match non-space character sequences.
+	re = regexp.MustCompile(`[\S]+`)
 )
 
 func init() {
@@ -194,5 +197,24 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 	err := s.UpdateGameStatus(0, "ghostping.ga")
 	if err != nil {
 		lit.Error("Can't set status, %s", err)
+	}
+
+	// Checks for unused commands and deletes them
+	if cmds, err := s.ApplicationCommands(s.State.User.ID, ""); err == nil {
+		for _, c := range cmds {
+			if commandHandlers[c.Name] == nil {
+				_ = s.ApplicationCommandDelete(s.State.User.ID, "", c.ID)
+				lit.Info("Deleted unused command %s", c.Name)
+			}
+
+		}
+	}
+
+	// And add commands used
+	for _, v := range commands {
+		_, err := s.ApplicationCommandCreate(s.State.User.ID, "", v)
+		if err != nil {
+			lit.Error("Cannot create '%v' command: %v", v.Name, err)
+		}
 	}
 }

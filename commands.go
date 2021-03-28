@@ -170,7 +170,7 @@ var (
 			}
 			toSend = fmt.Sprintf("Number of words: %d\n\n", cont) + toSend
 
-			sendEmbedInteractionFollowup(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Words", toSend).
+			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Words", toSend).
 				SetColor(0x7289DA).MessageEmbed, i.Interaction)
 		},
 
@@ -224,7 +224,7 @@ var (
 			}
 			toSend = fmt.Sprintf("Number of messages: %d\n\n", cont) + toSend
 
-			sendEmbedInteractionFollowup(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Messages", toSend).
+			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Messages", toSend).
 				SetColor(0x7289DA).MessageEmbed, i.Interaction)
 		},
 
@@ -285,7 +285,7 @@ var (
 			}
 			toSend = fmt.Sprintf("Number of characters per message sent: %d\n\n", cont) + toSend
 
-			sendEmbedInteractionFollowup(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Characters per message", toSend).
+			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Characters per message", toSend).
 				SetColor(0x7289DA).MessageEmbed, i.Interaction)
 
 		},

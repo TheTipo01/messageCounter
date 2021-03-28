@@ -23,11 +23,6 @@ func sendEmbedInteractionFollowup(s *discordgo.Session, embed *discordgo.Message
 	}
 }
 
-// Counts the number of word in a string
-func wordCount(str string) int {
-	return len(re.FindAllString(str, -1))
-}
-
 // Sorts a map into an array
 func sorting(classifica map[string]int) []kv {
 	var ss []kv

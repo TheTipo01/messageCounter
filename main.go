@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/viper"
 	"os"
 	"os/signal"
-	"regexp"
 	"strings"
 	"syscall"
 )
@@ -20,8 +19,6 @@ var (
 	db *sql.DB
 	// Server structure for all the things we need (currently only the number of messages)
 	server = make(map[string]*Server)
-	// Match non-space character sequences.
-	re = regexp.MustCompile(`[\S]+`)
 )
 
 func init() {

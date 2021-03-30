@@ -66,13 +66,11 @@ func deleteMessage(s *discordgo.Session, m *discordgo.Message) {
 	_ = db.QueryRow("SELECT message FROM messages WHERE guildID=? AND channelID=? AND messageID=?", m.GuildID, m.ChannelID, m.ID).Scan(&message)
 	_ = jsoniter.ConfigFastest.Unmarshal([]byte(message), &oldMessage)
 
-	now := time.Now()
-
 	if oldMessage.MentionEveryone {
 		insertData(s, &oldMessage, nil)
 
-		stm, _ = db.Prepare("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, ?, ?)")
-		_, err = stm.Exec(oldMessage.Author.ID, "everyone", oldMessage.ChannelID, oldMessage.GuildID, now, oldMessage.ID)
+		stm, _ = db.Prepare("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, NOW(), ?)")
+		_, err = stm.Exec(oldMessage.Author.ID, "everyone", oldMessage.ChannelID, oldMessage.GuildID, oldMessage.ID)
 		if err != nil {
 			lit.Error("Error inserting row in the database, %s", err)
 		}
@@ -83,8 +81,8 @@ func deleteMessage(s *discordgo.Session, m *discordgo.Message) {
 			for _, mention := range oldMessage.Mentions {
 				insertData(s, &oldMessage, mention)
 
-				stm, _ = db.Prepare("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, ?, ?)")
-				_, err = stm.Exec(oldMessage.Author.ID, mention.ID, oldMessage.ChannelID, oldMessage.GuildID, now, oldMessage.ID)
+				stm, _ = db.Prepare("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, NOW(), ?)")
+				_, err = stm.Exec(oldMessage.Author.ID, mention.ID, oldMessage.ChannelID, oldMessage.GuildID, oldMessage.ID)
 				if err != nil {
 					lit.Error("Error inserting row in the database, %s", err)
 				}
@@ -119,7 +117,6 @@ func updateMessage(s *discordgo.Session, m *discordgo.Message) {
 	// Compare mentions
 	var (
 		found = false
-		now   = time.Now()
 	)
 
 	// If the ping didn't change to @everyone, we check deeply
@@ -135,8 +132,8 @@ func updateMessage(s *discordgo.Session, m *discordgo.Message) {
 			// User was ghostpinged, we add that to the database
 			insertData(s, m, oldM)
 
-			stm, _ = db.Prepare("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, ?, ?)")
-			_, err = stm.Exec(m.Author.ID, oldM.ID, m.ChannelID, m.GuildID, now, m.ID)
+			stm, _ = db.Prepare("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, NOW(), ?)")
+			_, err = stm.Exec(m.Author.ID, oldM.ID, m.ChannelID, m.GuildID, m.ID)
 			if err != nil {
 				lit.Error("Error inserting row in the database, %s", err)
 			}
@@ -151,8 +148,8 @@ func updateMessage(s *discordgo.Session, m *discordgo.Message) {
 	if !m.MentionEveryone && oldMessage.MentionEveryone {
 		insertData(s, &oldMessage, nil)
 
-		stm, _ = db.Prepare("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, ?, ?)")
-		_, err = stm.Exec(m.Author.ID, "everyone", m.ChannelID, m.GuildID, now, m.ID)
+		stm, _ = db.Prepare("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, NOW(), ?)")
+		_, err = stm.Exec(m.Author.ID, "everyone", m.ChannelID, m.GuildID, m.ID)
 		if err != nil {
 			lit.Error("Error inserting row in the database, %s", err)
 		}

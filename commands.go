@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
-	jsoniter "github.com/json-iterator/go"
+	"github.com/goccy/go-json"
 	"regexp"
 )
 
@@ -67,14 +67,14 @@ var (
 		// Prints the number of characters sent for a given channel, or if not specified for the entire server
 		"characters": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			var (
-				mex                 *sql.Rows
-				err                 error
-				json                = jsoniter.ConfigFastest
-				messageJSON, toSend string
-				m                   discordgo.Message
-				cont                int
-				characters          = make(map[string]int)
-				people              = make(map[string]string)
+				mex         *sql.Rows
+				err         error
+				messageJSON []byte
+				toSend      string
+				m           discordgo.Message
+				cont        int
+				characters  = make(map[string]int)
+				people      = make(map[string]string)
 			)
 
 			// If there's a specified channel, use it in the query
@@ -95,7 +95,7 @@ var (
 					return
 				}
 
-				err = json.Unmarshal([]byte(messageJSON), &m)
+				err = json.Unmarshal(messageJSON, &m)
 				if err != nil {
 					lit.Error("Can't unmarshal JSON, %s", err)
 					continue
@@ -121,14 +121,14 @@ var (
 		// Prints the number of words sent for a given channel, or if not specified for the entire server
 		"words": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			var (
-				mex                 *sql.Rows
-				err                 error
-				json                = jsoniter.ConfigFastest
-				messageJSON, toSend string
-				m                   discordgo.Message
-				cont                int
-				words               = make(map[string]int)
-				people              = make(map[string]string)
+				mex         *sql.Rows
+				err         error
+				messageJSON []byte
+				toSend      string
+				m           discordgo.Message
+				cont        int
+				words       = make(map[string]int)
+				people      = make(map[string]string)
 				// Match non-space character sequences.
 				re = regexp.MustCompile(`[\S]+`)
 			)
@@ -151,7 +151,7 @@ var (
 					return
 				}
 
-				err = json.Unmarshal([]byte(messageJSON), &m)
+				err = json.Unmarshal(messageJSON, &m)
 				if err != nil {
 					lit.Error("Can't unmarshal JSON, %s", err)
 					continue
@@ -177,14 +177,14 @@ var (
 		// Prints the number of messages sent for a given channel, or if not specified for the entire server
 		"messages": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			var (
-				mex                 *sql.Rows
-				err                 error
-				json                = jsoniter.ConfigFastest
-				messageJSON, toSend string
-				m                   discordgo.Message
-				cont                int
-				people              = make(map[string]string)
-				messages            = make(map[string]int)
+				mex         *sql.Rows
+				err         error
+				messageJSON []byte
+				toSend      string
+				m           discordgo.Message
+				cont        int
+				people      = make(map[string]string)
+				messages    = make(map[string]int)
 			)
 
 			// If there's a specified channel, use it in the query
@@ -205,7 +205,7 @@ var (
 					return
 				}
 
-				err = json.Unmarshal([]byte(messageJSON), &m)
+				err = json.Unmarshal(messageJSON, &m)
 				if err != nil {
 					lit.Error("Can't unmarshal JSON, %s", err)
 					continue
@@ -231,16 +231,16 @@ var (
 		// Prints stats for a given channel, or if not specified for the entire server.
 		"charsPerMex": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			var (
-				mex                 *sql.Rows
-				err                 error
-				json                = jsoniter.ConfigFastest
-				messageJSON, toSend string
-				m                   discordgo.Message
-				cont                int
-				characters          = make(map[string]int)
-				people              = make(map[string]string)
-				messages            = make(map[string]int)
-				charPerMex          = make(map[string]int)
+				mex         *sql.Rows
+				err         error
+				messageJSON []byte
+				toSend      string
+				m           discordgo.Message
+				cont        int
+				characters  = make(map[string]int)
+				people      = make(map[string]string)
+				messages    = make(map[string]int)
+				charPerMex  = make(map[string]int)
 			)
 
 			// If there's a specified channel, use it in the query
@@ -261,7 +261,7 @@ var (
 					return
 				}
 
-				err = json.Unmarshal([]byte(messageJSON), &m)
+				err = json.Unmarshal(messageJSON, &m)
 				if err != nil {
 					lit.Error("Can't unmarshal JSON, %s", err)
 					continue

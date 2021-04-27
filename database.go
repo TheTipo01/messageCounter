@@ -5,7 +5,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
 	"github.com/go-co-op/gocron"
-	jsoniter "github.com/json-iterator/go"
+	"github.com/goccy/go-json"
 	"strings"
 	"time"
 )
@@ -37,7 +37,7 @@ func execQuery(query string) {
 func addMessage(m *discordgo.Message) {
 	stm, _ := db.Prepare("INSERT INTO messages (guildID, channelID, messageID, message) VALUES (?, ?, ?, ?)")
 
-	inJSON, _ := jsoniter.ConfigFastest.Marshal(m)
+	inJSON, _ := json.Marshal(m)
 
 	_, err := stm.Exec(m.GuildID, m.ChannelID, m.ID, string(inJSON))
 	if err != nil {
@@ -59,12 +59,12 @@ func deleteMessage(s *discordgo.Session, m *discordgo.Message) {
 
 	// Add mentions to the pings table
 	var (
-		message    string
+		message    []byte
 		oldMessage discordgo.Message
 	)
 
 	_ = db.QueryRow("SELECT message FROM messages WHERE guildID=? AND channelID=? AND messageID=?", m.GuildID, m.ChannelID, m.ID).Scan(&message)
-	_ = jsoniter.ConfigFastest.Unmarshal([]byte(message), &oldMessage)
+	_ = json.Unmarshal(message, &oldMessage)
 
 	if oldMessage.MentionEveryone {
 		insertData(s, &oldMessage, nil)
@@ -96,15 +96,15 @@ func deleteMessage(s *discordgo.Session, m *discordgo.Message) {
 func updateMessage(s *discordgo.Session, m *discordgo.Message) {
 	// Get old message, to compare mentions
 	var (
-		message    string
+		message    []byte
 		oldMessage discordgo.Message
 	)
 
 	_ = db.QueryRow("SELECT message FROM messages WHERE guildID=? AND channelID=? AND messageID=?", m.GuildID, m.ChannelID, m.ID).Scan(&message)
-	_ = jsoniter.ConfigFastest.Unmarshal([]byte(message), &oldMessage)
+	_ = json.Unmarshal(message, &oldMessage)
 
 	// Update existing message
-	jsonMessage, _ := jsoniter.ConfigFastest.Marshal(m)
+	jsonMessage, _ := json.Marshal(m)
 
 	stm, _ := db.Prepare("UPDATE messages SET message=? WHERE guildID=? AND channelID=? AND messageID=?")
 	_, err := stm.Exec(string(jsonMessage), m.GuildID, m.ChannelID, m.ID)
@@ -250,7 +250,7 @@ func loadScheduler(s *discordgo.Session) {
 		// Send random message from a channel every monday at midnight
 		_, _ = cron.Every(1).Monday().At("00:00:00").Do(func() {
 			var (
-				messageJSON string
+				messageJSON []byte
 				message     discordgo.Message
 				err         error
 			)
@@ -261,7 +261,7 @@ func loadScheduler(s *discordgo.Session) {
 				return
 			}
 
-			err = jsoniter.ConfigFastest.Unmarshal([]byte(messageJSON), &message)
+			err = json.Unmarshal(messageJSON, &message)
 			if err != nil {
 				lit.Error("Can't unmarshall message, %s", err)
 				return

@@ -255,7 +255,7 @@ func loadScheduler(s *discordgo.Session) {
 				err         error
 			)
 
-			err = db.QueryRow("SELECT message FROM messages WHERE guildID=? AND channelID=? ORDER BY RAND() LIMIT 1", guildID, channelID).Scan(&messageJSON)
+			err = db.QueryRow("SELECT message FROM messages WHERE guildID=? AND channelID=? AND deleted = 0 ORDER BY RAND() LIMIT 1", guildID, channelID).Scan(&messageJSON)
 			if err != nil {
 				lit.Error("Can't get random message, %s", err)
 				return

@@ -78,8 +78,8 @@ var (
 			)
 
 			// If there's a specified channel, use it in the query
-			if len(i.Data.Options) > 0 {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.Data.Options[0].ChannelValue(s).ID)
+			if len(i.ApplicationCommandData().Options) > 0 {
+				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.ApplicationCommandData().Options[0].ChannelValue(s).ID)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}
@@ -134,8 +134,8 @@ var (
 			)
 
 			// If there's a specified channel, use it in the query
-			if len(i.Data.Options) > 0 {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.Data.Options[0].ChannelValue(s).ID)
+			if len(i.ApplicationCommandData().Options) > 0 {
+				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.ApplicationCommandData().Options[0].ChannelValue(s).ID)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}
@@ -188,8 +188,9 @@ var (
 			)
 
 			// If there's a specified channel, use it in the query
-			if len(i.Data.Options) > 0 {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.Data.Options[0].ChannelValue(s).ID)
+
+			if len(i.ApplicationCommandData().Options) > 0 {
+				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.ApplicationCommandData().Options[0].ChannelValue(s).ID)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}
@@ -244,8 +245,8 @@ var (
 			)
 
 			// If there's a specified channel, use it in the query
-			if len(i.Data.Options) > 0 {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.Data.Options[0].ChannelValue(s).ID)
+			if len(i.ApplicationCommandData().Options) > 0 {
+				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.ApplicationCommandData().Options[0].ChannelValue(s).ID)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}

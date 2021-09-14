@@ -356,15 +356,15 @@ var (
 				wordclouds.Colors([]color.Color{color.RGBA{R: 247, G: 144, B: 30, A: 255}, color.RGBA{R: 194, G: 69, B: 39, A: 255}, color.RGBA{R: 38, G: 103, B: 118, A: 255}, color.RGBA{R: 173, G: 210, B: 224, A: 255}}),
 			)
 
-			var imgPng *bytes.Buffer
+			var imgPng bytes.Buffer
 
 			// Draws image
 			img := w.Draw()
 			// Encodes it
-			png.Encode(imgPng, img)
+			_ = png.Encode(&imgPng, img)
 
 			// Send it in a channel
-			sentImg, err := s.ChannelFileSend(i.ChannelID, "wordcloud.png", imgPng)
+			sentImg, err := s.ChannelFileSend(i.ChannelID, "wordcloud.png", &imgPng)
 			if err != nil {
 				lit.Error("Error while sending image " + err.Error())
 				return

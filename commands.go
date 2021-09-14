@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
 	"github.com/goccy/go-json"
+	"github.com/psykhi/wordclouds"
+	"image/color"
+	"image/png"
 	"regexp"
+	"strings"
 )
 
 var (
@@ -51,6 +56,18 @@ var (
 		{
 			Name:        "charsPerMex",
 			Description: "Prints the number of characters per message sent for a channel, or the entire server if omitted",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionChannel,
+					Name:        "channel",
+					Description: "Optional channel to get stats for",
+					Required:    false,
+				},
+			},
+		},
+		{
+			Name:        "wordcloud",
+			Description: "Generates a word cloud for a channel, or the entire server if omitted",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionChannel,
@@ -289,6 +306,77 @@ var (
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Characters per message", toSend).
 				SetColor(0x7289DA).MessageEmbed, i.Interaction)
 
+		},
+
+		// Generates a word cloud for a channel, or the entire server if omitted
+		"wordcloud": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			var (
+				mex         *sql.Rows
+				err         error
+				messageJSON []byte
+				m           discordgo.Message
+				words       = make(map[string]int)
+			)
+
+			// If there's a specified channel, use it in the query
+			if len(i.ApplicationCommandData().Options) > 0 {
+				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.ApplicationCommandData().Options[0].ChannelValue(s).ID)
+			} else {
+				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
+			}
+			if err != nil {
+				lit.Error("Can't query database, %s", err)
+				return
+			}
+
+			for mex.Next() {
+				err = mex.Scan(&messageJSON)
+				if err != nil {
+					lit.Error("Can't scan m, %s", err)
+					continue
+				}
+
+				err = json.Unmarshal(messageJSON, &m)
+				if err != nil {
+					lit.Error("Can't unmarshal JSON, %s", err)
+					continue
+				}
+
+				mSplitted := strings.Fields(strings.ToLower(m.Content))
+				for _, word := range mSplitted {
+					words[word]++
+				}
+			}
+
+			w := wordclouds.NewWordcloud(
+				words,
+				wordclouds.FontFile("./fonts/Roboto-Regular.ttf"),
+				wordclouds.Height(2048),
+				wordclouds.Width(2048),
+				wordclouds.Colors([]color.Color{color.RGBA{R: 247, G: 144, B: 30, A: 255}, color.RGBA{R: 194, G: 69, B: 39, A: 255}, color.RGBA{R: 38, G: 103, B: 118, A: 255}, color.RGBA{R: 173, G: 210, B: 224, A: 255}}),
+			)
+
+			var imgPng *bytes.Buffer
+
+			// Draws image
+			img := w.Draw()
+			// Encodes it
+			png.Encode(imgPng, img)
+
+			// Send it in a channel
+			sentImg, err := s.ChannelFileSend(i.ChannelID, "wordcloud.png", imgPng)
+			if err != nil {
+				lit.Error("Error while sending image " + err.Error())
+				return
+			}
+
+			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).SetColor(0x7289DA).SetImage(m.Attachments[0].URL).
+				MessageEmbed, i.Interaction)
+
+			err = s.ChannelMessageDelete(sentImg.ChannelID, sentImg.ID)
+			if err != nil {
+				lit.Error("Error while deleting sent image " + err.Error())
+			}
 		},
 	}
 )

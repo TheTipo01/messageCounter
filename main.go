@@ -5,12 +5,20 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/spf13/viper"
+	"github.com/kkyr/fig"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 )
+
+// Config holds data parsed from the config.yml
+type Config struct {
+	Token    string `fig:"token" validate:"required"`
+	Driver   string `fig:"drivername" validate:"required"`
+	DSN      string `fig:"datasourcename" validate:"required"`
+	LogLevel string `fig:"loglevel" validate:"required"`
+}
 
 var (
 	// Discord bot token
@@ -24,64 +32,43 @@ var (
 func init() {
 	lit.LogLevel = lit.LogError
 
-	viper.SetConfigName("config")
-	viper.SetConfigType("yml")
-	viper.AddConfigPath(".")
-
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			// Config file not found
-			lit.Error("Config file not found! See example_config.yml")
-			return
-		}
-	} else {
-		// Config file found
-		token = viper.GetString("token")
-
-		// Set lit.LogLevel to the given value
-		switch strings.ToLower(viper.GetString("loglevel")) {
-		case "logerror", "error":
-			lit.LogLevel = lit.LogError
-			break
-		case "logwarning", "warning":
-			lit.LogLevel = lit.LogWarning
-			break
-		case "loginformational", "informational":
-			lit.LogLevel = lit.LogInformational
-			break
-		case "logdebug", "debug":
-			lit.LogLevel = lit.LogDebug
-			break
-		}
-
-		// Open database connection
-		db, err = sql.Open(viper.GetString("drivername"), viper.GetString("datasourcename"))
-		if err != nil {
-			lit.Error("Error opening db connection, %s", err)
-			return
-		}
-
-		// Initialize tables
-		execQuery(tblMessages)
-		execQuery(tblUsers)
-		execQuery(tblServer)
-		execQuery(tblChannels)
-		execQuery(tblPings)
-		execQuery(tblConfig)
-
-		// And add the everyone user to the table, as we use that for logging @everyone and @here
-		stm, _ := db.Prepare("INSERT INTO users (id, nickname) VALUES(?, ?)")
-		_, err = stm.Exec("everyone", "everyone")
-		if err != nil {
-			str := err.Error()
-			if !strings.HasPrefix(str, "Error 1062: Duplicate entry") {
-				lit.Error("Error inserting user everyone in the database, %s", str)
-			}
-		}
-		_ = stm.Close()
-
+	var cfg Config
+	err := fig.Load(&cfg, fig.File("config.yml"), fig.Dirs(".", "./data"))
+	if err != nil {
+		lit.Error(err.Error())
+		return
 	}
 
+	token = cfg.Token
+
+	// Set lit.LogLevel to the given value
+	switch strings.ToLower(cfg.LogLevel) {
+	case "logwarning", "warning":
+		lit.LogLevel = lit.LogWarning
+	case "loginformational", "informational":
+		lit.LogLevel = lit.LogInformational
+	case "logdebug", "debug":
+		lit.LogLevel = lit.LogDebug
+	}
+
+	// Open database connection
+	db, err = sql.Open(cfg.Driver, cfg.DSN)
+	if err != nil {
+		lit.Error("Error opening db connection, %s", err)
+		return
+	}
+
+	// Initialize tables
+	execQuery(tblMessages, tblUsers, tblServer, tblChannels, tblPings, tblConfig)
+
+	// And add the everyone user to the table, as we use that for logging @everyone and @here
+	_, err = db.Exec("INSERT INTO users (id, nickname) VALUES(?, ?)", "everyone", "everyone")
+	if err != nil {
+		str := err.Error()
+		if !strings.HasPrefix(str, "Error 1062: Duplicate entry") {
+			lit.Error("Error inserting user everyone in the database, %s", str)
+		}
+	}
 }
 
 func main() {
@@ -213,14 +200,19 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 				lit.Info("Deleted unused command %s", c.Name)
 			}
 
-		}
-	}
+			// Compare commands with the ones in commands, if they are different we re-create them
+			for _, v := range commands {
+				if c.Name == v.Name {
+					if !isCommandEqual(c, v) {
+						_, err := s.ApplicationCommandCreate(s.State.User.ID, "", v)
+						if err != nil {
+							lit.Error("Cannot create '%v' command: %v", v.Name, err)
+						}
+					}
+					break
+				}
 
-	// And add commands used
-	for _, v := range commands {
-		_, err := s.ApplicationCommandCreate(s.State.User.ID, "", v)
-		if err != nil {
-			lit.Error("Cannot create '%v' command: %v", v.Name, err)
+			}
 		}
 	}
 }

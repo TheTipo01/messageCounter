@@ -12,6 +12,7 @@ import (
 	"image/png"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 var (
@@ -344,7 +345,9 @@ var (
 
 				mSplitted := strings.Fields(strings.ToLower(m.Content))
 				for _, word := range mSplitted {
-					words[word]++
+					if utf8.RuneCountInString(word) > 3 {
+						words[word]++
+					}
 				}
 			}
 

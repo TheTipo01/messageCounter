@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
 	"github.com/go-co-op/gocron"
@@ -20,42 +19,31 @@ const (
 )
 
 // Executes a simple query given a DB
-func execQuery(query string) {
-	statement, err := db.Prepare(query)
-	if err != nil {
-		lit.Error("Error preparing query, %s", err)
-		return
-	}
-
-	_, err = statement.Exec()
-	if err != nil {
-		lit.Error("Error creating table, %s", err)
+func execQuery(query ...string) {
+	for _, q := range query {
+		_, err := db.Exec(q)
+		if err != nil {
+			lit.Error("Error executing query, %s", err)
+			return
+		}
 	}
 }
 
 // addMessage adds a message to the db
 func addMessage(m *discordgo.Message) {
-	stm, _ := db.Prepare("INSERT INTO messages (guildID, channelID, messageID, message) VALUES (?, ?, ?, ?)")
-
 	inJSON, _ := json.Marshal(m)
-
-	_, err := stm.Exec(m.GuildID, m.ChannelID, m.ID, string(inJSON))
+	_, err := db.Exec("INSERT INTO messages (guildID, channelID, messageID, message) VALUES (?, ?, ?, ?)", m.GuildID, m.ChannelID, m.ID, string(inJSON))
 	if err != nil {
 		lit.Error("Error while inserting message into db, %s", err)
 	}
-
-	_ = stm.Close()
 }
 
 func deleteMessage(s *discordgo.Session, m *discordgo.Message) {
 	// Set delete flag up
-	stm, _ := db.Prepare("UPDATE messages SET deleted=1 WHERE guildID=? AND channelID=? AND messageID=?")
-	_, err := stm.Exec(m.GuildID, m.ChannelID, m.ID)
+	_, err := db.Exec("UPDATE messages SET deleted=1 WHERE guildID=? AND channelID=? AND messageID=?", m.GuildID, m.ChannelID, m.ID)
 	if err != nil {
 		lit.Error("Error updating row from the database, %s", err)
 	}
-
-	_ = stm.Close()
 
 	// Add mentions to the pings table
 	var (
@@ -69,25 +57,21 @@ func deleteMessage(s *discordgo.Session, m *discordgo.Message) {
 	if oldMessage.MentionEveryone {
 		insertData(s, &oldMessage, nil)
 
-		stm, _ = db.Prepare("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, NOW(), ?)")
-		_, err = stm.Exec(oldMessage.Author.ID, "everyone", oldMessage.ChannelID, oldMessage.GuildID, oldMessage.ID)
+		_, err = db.Exec("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, NOW(), ?)",
+			oldMessage.Author.ID, "everyone", oldMessage.ChannelID, oldMessage.GuildID, oldMessage.ID)
 		if err != nil {
 			lit.Error("Error inserting row in the database, %s", err)
 		}
-
-		_ = stm.Close()
 	} else {
 		if len(oldMessage.Mentions) > 0 {
 			for _, mention := range oldMessage.Mentions {
 				insertData(s, &oldMessage, mention)
 
-				stm, _ = db.Prepare("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, NOW(), ?)")
-				_, err = stm.Exec(oldMessage.Author.ID, mention.ID, oldMessage.ChannelID, oldMessage.GuildID, oldMessage.ID)
+				_, err = db.Exec("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, NOW(), ?)",
+					oldMessage.Author.ID, mention.ID, oldMessage.ChannelID, oldMessage.GuildID, oldMessage.ID)
 				if err != nil {
 					lit.Error("Error inserting row in the database, %s", err)
 				}
-
-				_ = stm.Close()
 			}
 		}
 	}
@@ -106,13 +90,10 @@ func updateMessage(s *discordgo.Session, m *discordgo.Message) {
 	// Update existing message
 	jsonMessage, _ := json.Marshal(m)
 
-	stm, _ := db.Prepare("UPDATE messages SET message=? WHERE guildID=? AND channelID=? AND messageID=?")
-	_, err := stm.Exec(string(jsonMessage), m.GuildID, m.ChannelID, m.ID)
+	_, err := db.Exec("UPDATE messages SET message=? WHERE guildID=? AND channelID=? AND messageID=?", string(jsonMessage), m.GuildID, m.ChannelID, m.ID)
 	if err != nil {
 		lit.Error("Error updating row from the database, %s", err)
 	}
-
-	_ = stm.Close()
 
 	// Compare mentions
 	var (
@@ -132,13 +113,11 @@ func updateMessage(s *discordgo.Session, m *discordgo.Message) {
 			// User was ghostpinged, we add that to the database
 			insertData(s, m, oldM)
 
-			stm, _ = db.Prepare("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, NOW(), ?)")
-			_, err = stm.Exec(m.Author.ID, oldM.ID, m.ChannelID, m.GuildID, m.ID)
+			_, err = db.Exec("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, NOW(), ?)",
+				m.Author.ID, oldM.ID, m.ChannelID, m.GuildID, m.ID)
 			if err != nil {
 				lit.Error("Error inserting row in the database, %s", err)
 			}
-
-			_ = stm.Close()
 		} else {
 			found = false
 		}
@@ -148,13 +127,10 @@ func updateMessage(s *discordgo.Session, m *discordgo.Message) {
 	if !m.MentionEveryone && oldMessage.MentionEveryone {
 		insertData(s, &oldMessage, nil)
 
-		stm, _ = db.Prepare("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, NOW(), ?)")
-		_, err = stm.Exec(m.Author.ID, "everyone", m.ChannelID, m.GuildID, m.ID)
+		_, err = db.Exec("INSERT INTO pings (menzionatoreId, menzionatoId, channelId, serverId, timestamp, messageId) VALUES(?, ?, ?, ?, NOW(), ?)", m.Author.ID, "everyone", m.ChannelID, m.GuildID, m.ID)
 		if err != nil {
 			lit.Error("Error inserting row in the database, %s", err)
 		}
-
-		_ = stm.Close()
 	}
 }
 
@@ -162,30 +138,25 @@ func updateMessage(s *discordgo.Session, m *discordgo.Message) {
 func insertData(s *discordgo.Session, message *discordgo.Message, mention *discordgo.User) {
 	var (
 		err error
-		stm *sql.Stmt
 		str string
 	)
 
 	// Guild
 	g, err := s.Guild(message.GuildID)
 	if err == nil {
-		stm, _ = db.Prepare("INSERT INTO server (id, name) VALUES(?, ?)")
-		_, err = stm.Exec(g.ID, g.Name)
+		_, err = db.Exec("INSERT INTO server (id, name) VALUES(?, ?)", g.ID, g.Name)
 		if err != nil {
 			str = err.Error()
 			if !strings.HasPrefix(str, "Error 1062: Duplicate entry") {
 				lit.Error("Error inserting channel in the database, %s", str)
 			}
 		}
-
-		_ = stm.Close()
 	} else {
 		lit.Error("cannot create guild, %s", err)
 	}
 
 	// Author insert
-	stm, _ = db.Prepare("INSERT INTO users (id, nickname) VALUES(?, ?)")
-	_, err = stm.Exec(message.Author.ID, message.Author.Username)
+	_, err = db.Exec("INSERT INTO users (id, nickname) VALUES(?, ?)", message.Author.ID, message.Author.Username)
 	if err != nil {
 		str = err.Error()
 		if !strings.HasPrefix(str, "Error 1062: Duplicate entry") {
@@ -193,35 +164,27 @@ func insertData(s *discordgo.Session, message *discordgo.Message, mention *disco
 		}
 	}
 
-	_ = stm.Close()
-
 	// Mentioned
 	if mention != nil {
-		stm, _ = db.Prepare("INSERT INTO users (id, nickname) VALUES(?, ?)")
-		_, err = stm.Exec(mention.ID, mention.Username)
+		_, err = db.Exec("INSERT INTO users (id, nickname) VALUES(?, ?)", mention.ID, mention.Username)
 		if err != nil {
 			str = err.Error()
 			if !strings.HasPrefix(str, "Error 1062: Duplicate entry") {
 				lit.Error("Error inserting user in the database, %s", str)
 			}
 		}
-
-		_ = stm.Close()
 	}
 
 	// Channel
 	channel, err := s.Channel(message.ChannelID)
 	if err == nil {
-		stm, _ = db.Prepare("INSERT INTO channels (id, name, serverId) VALUES(?, ?, ?)")
-		_, err = stm.Exec(channel.ID, channel.Name, channel.GuildID)
+		_, err = db.Exec("INSERT INTO channels (id, name, serverId) VALUES(?, ?, ?)", channel.ID, channel.Name, channel.GuildID)
 		if err != nil {
 			str = err.Error()
 			if !strings.HasPrefix(str, "Error 1062: Duplicate entry") {
 				lit.Error("Error inserting channel in the database, %s", str)
 			}
 		}
-
-		_ = stm.Close()
 	} else {
 		lit.Error("cannot create channel, %s", err)
 	}

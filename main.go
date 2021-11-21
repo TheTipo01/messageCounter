@@ -200,6 +200,8 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 		found := false
 
 		for _, l := range commands {
+			found = false
+
 			for _, o := range cmds {
 				// We compare every online command with the ones locally stored, to find if a command with the same name exists
 				if l.Name == o.Name {
@@ -226,8 +228,6 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 				if err != nil {
 					lit.Error("Cannot create '%s' command: %s", l.Name, err)
 				}
-
-				found = false
 			}
 		}
 	}

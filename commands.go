@@ -413,7 +413,7 @@ var (
 
 			toSend = "Last " + strconv.Itoa(int(number)) + " deleted messages:\n```"
 
-			rows, err := db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=? LIMIT ?", i.GuildID, i.ChannelID, number)
+			rows, err := db.Query("SELECT message FROM messages WHERE deleted = 1 AND guildID=? AND channelID=? ORDER BY messageID DESC LIMIT ?", i.GuildID, i.ChannelID, number)
 			if err != nil {
 				lit.Error("Can't query database, %s", err)
 				return
@@ -422,8 +422,7 @@ var (
 			for rows.Next() {
 				toAdd = ""
 
-				err = rows.Scan(&m)
-
+				err = rows.Scan(&messageJSON)
 				if err != nil {
 					lit.Error("Can't scan m, %s", err)
 					continue
@@ -440,10 +439,15 @@ var (
 				}
 
 				for _, e := range m.Embeds {
-					toAdd += e.Description + "\n"
+					for _, f := range e.Fields {
+						toAdd += f.Name + ": " + f.Value + "\n"
+					}
 				}
 
-				toSend += m.Author.Username + ": " + toAdd + m.Content + "\n"
+				if m.Author != nil {
+					toSend += m.Author.Username
+				}
+				toSend += ": " + toAdd + m.Content + "\n"
 			}
 
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Undelete", strings.TrimSuffix(toSend, "\n")+"```").

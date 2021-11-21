@@ -11,6 +11,7 @@ import (
 	"image/color"
 	"image/png"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -74,6 +75,18 @@ var (
 					Type:        discordgo.ApplicationCommandOptionChannel,
 					Name:        "channel",
 					Description: "Optional channel to get stats for",
+					Required:    false,
+				},
+			},
+		},
+		{
+			Name:        "undelete",
+			Description: "Recovers the last n delete messages from the current channel",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "number",
+					Description: "How many messages to recover",
 					Required:    false,
 				},
 			},
@@ -380,6 +393,61 @@ var (
 			if err != nil {
 				lit.Error("Error while deleting sent image " + err.Error())
 			}
+		},
+
+		"undelete": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			var (
+				number      uint
+				m           discordgo.Message
+				messageJSON []byte
+				toSend      string
+				toAdd       string
+			)
+
+			if len(i.ApplicationCommandData().Options) > 0 {
+				number = uint(i.ApplicationCommandData().Options[0].UintValue())
+			} else {
+				// Default value
+				number = 3
+			}
+
+			toSend = "Last " + strconv.Itoa(int(number)) + " deleted messages:\n```"
+
+			rows, err := db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=? LIMIT ?", i.GuildID, i.ChannelID, number)
+			if err != nil {
+				lit.Error("Can't query database, %s", err)
+				return
+			}
+
+			for rows.Next() {
+				toAdd = ""
+
+				err = rows.Scan(&m)
+
+				if err != nil {
+					lit.Error("Can't scan m, %s", err)
+					continue
+				}
+
+				err = json.Unmarshal(messageJSON, &m)
+				if err != nil {
+					lit.Error("Can't unmarshal JSON, %s", err)
+					continue
+				}
+
+				for _, a := range m.Attachments {
+					toAdd += a.ID + "\n"
+				}
+
+				for _, e := range m.Embeds {
+					toAdd += e.Description + "\n"
+				}
+
+				toSend += m.Author.Username + ": " + toAdd + m.Content + "\n"
+			}
+
+			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Undelete", strings.TrimSuffix(toSend, "\n")+"```").
+				SetColor(0x7289DA).MessageEmbed, i.Interaction)
 		},
 	}
 )

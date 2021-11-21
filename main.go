@@ -88,8 +88,11 @@ func main() {
 
 	// Add commands handler
 	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
-			h(s, i)
+		// Ignores commands from DM
+		if i.User == nil {
+			if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
+				h(s, i)
+			}
 		}
 	})
 
@@ -204,14 +207,15 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 			for _, v := range commands {
 				if c.Name == v.Name {
 					if !isCommandEqual(c, v) {
-						_, err := s.ApplicationCommandCreate(s.State.User.ID, "", v)
+						lit.Info("Registering command `%s`", v.Name)
+
+						_, err = s.ApplicationCommandCreate(s.State.User.ID, "", v)
 						if err != nil {
-							lit.Error("Cannot create '%v' command: %v", v.Name, err)
+							lit.Error("Cannot create '%s' command: %s", v.Name, err)
 						}
 					}
 					break
 				}
-
 			}
 		}
 	}

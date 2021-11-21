@@ -56,7 +56,7 @@ var (
 			},
 		},
 		{
-			Name:        "charsPerMex",
+			Name:        "charspermex",
 			Description: "Prints the number of characters per message sent for a channel, or the entire server if omitted",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
@@ -261,7 +261,7 @@ var (
 		},
 
 		// Prints stats for a given channel, or if not specified for the entire server.
-		"charsPerMex": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"charspermex": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			var (
 				mex         *sql.Rows
 				err         error

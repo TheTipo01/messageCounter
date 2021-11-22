@@ -232,7 +232,7 @@ func loadScheduler(s *discordgo.Session) {
 
 			// If there's an attachments, add it
 			if len(message.Attachments) > 0 {
-				message.Content = message.Attachments[0].URL + message.Content
+				message.Content = message.Attachments[0].URL + "\n" + message.Content
 			}
 
 			_, err = s.ChannelMessageSend(channelToID, "Quote of the week:```\n"+message.Content+"```Submitted by "+message.Author.Username)

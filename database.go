@@ -230,6 +230,11 @@ func loadScheduler(s *discordgo.Session) {
 				return
 			}
 
+			// If there's an attachments, add it
+			if len(message.Attachments) > 0 {
+				message.Content = message.Attachments[0].URL + message.Content
+			}
+
 			_, err = s.ChannelMessageSend(channelToID, "Quote of the week:```\n"+message.Content+"```Submitted by "+message.Author.Username)
 			if err != nil {
 				lit.Error("Can't send message, %s", err)

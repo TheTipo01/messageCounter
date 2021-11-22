@@ -29,6 +29,12 @@ var (
 					Description: "Optional channel to get stats for",
 					Required:    false,
 				},
+				{
+					Type:        discordgo.ApplicationCommandOptionBoolean,
+					Name:        "includebot",
+					Description: "Whether to include or not message from bots",
+					Required:    false,
+				},
 			},
 		},
 		{
@@ -39,6 +45,12 @@ var (
 					Type:        discordgo.ApplicationCommandOptionChannel,
 					Name:        "channel",
 					Description: "Optional channel to get stats for",
+					Required:    false,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionBoolean,
+					Name:        "includebot",
+					Description: "Whether to include or not message from bots",
 					Required:    false,
 				},
 			},
@@ -53,6 +65,12 @@ var (
 					Description: "Optional channel to get stats for",
 					Required:    false,
 				},
+				{
+					Type:        discordgo.ApplicationCommandOptionBoolean,
+					Name:        "includebot",
+					Description: "Whether to include or not message from bots",
+					Required:    false,
+				},
 			},
 		},
 		{
@@ -65,6 +83,12 @@ var (
 					Description: "Optional channel to get stats for",
 					Required:    false,
 				},
+				{
+					Type:        discordgo.ApplicationCommandOptionBoolean,
+					Name:        "includebot",
+					Description: "Whether to include or not message from bots",
+					Required:    false,
+				},
 			},
 		},
 		{
@@ -75,6 +99,12 @@ var (
 					Type:        discordgo.ApplicationCommandOptionChannel,
 					Name:        "channel",
 					Description: "Optional channel to get stats for",
+					Required:    false,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionBoolean,
+					Name:        "includebot",
+					Description: "Whether to include or not message from bots",
 					Required:    false,
 				},
 			},
@@ -106,11 +136,22 @@ var (
 				cont        int
 				characters  = make(map[string]int)
 				people      = make(map[string]string)
+				channel string
+				bot bool
 			)
 
+			for _, o := range i.ApplicationCommandData().Options {
+				switch o.Type {
+				case discordgo.ApplicationCommandOptionChannel:
+					channel = o.ChannelValue(nil).ID
+				case discordgo.ApplicationCommandOptionBoolean:
+					bot = o.BoolValue()
+				}
+			}
+
 			// If there's a specified channel, use it in the query
-			if len(i.ApplicationCommandData().Options) > 0 {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.ApplicationCommandData().Options[0].ChannelValue(s).ID)
+			if channel != "" {
+				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, channel)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}
@@ -133,8 +174,15 @@ var (
 				}
 
 				if m.Author != nil {
-					characters[m.Author.ID] += len(m.Content)
-					people[m.Author.ID] = m.Author.Username
+					if bot {
+						characters[m.Author.ID] += len(m.Content)
+						people[m.Author.ID] = m.Author.Username
+					} else {
+						if !m.Author.Bot {
+							characters[m.Author.ID] += len(m.Content)
+							people[m.Author.ID] = m.Author.Username
+						}
+					}
 				}
 			}
 
@@ -162,11 +210,22 @@ var (
 				people      = make(map[string]string)
 				// Match non-space character sequences.
 				re = regexp.MustCompile(`[\S]+`)
+				channel string
+				bot bool
 			)
 
+			for _, o := range i.ApplicationCommandData().Options {
+				switch o.Type {
+				case discordgo.ApplicationCommandOptionChannel:
+					channel = o.ChannelValue(nil).ID
+				case discordgo.ApplicationCommandOptionBoolean:
+					bot = o.BoolValue()
+				}
+			}
+
 			// If there's a specified channel, use it in the query
-			if len(i.ApplicationCommandData().Options) > 0 {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.ApplicationCommandData().Options[0].ChannelValue(s).ID)
+			if channel != "" {
+				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, channel)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}
@@ -189,8 +248,15 @@ var (
 				}
 
 				if m.Author != nil {
-					people[m.Author.ID] = m.Author.Username
-					words[m.Author.ID] += len(re.FindAllString(m.Content, -1))
+					if bot {
+						people[m.Author.ID] = m.Author.Username
+						words[m.Author.ID] += len(re.FindAllString(m.Content, -1))
+					} else {
+						if !m.Author.Bot {
+							people[m.Author.ID] = m.Author.Username
+							words[m.Author.ID] += len(re.FindAllString(m.Content, -1))
+						}
+					}
 				}
 			}
 
@@ -216,12 +282,22 @@ var (
 				cont        int
 				people      = make(map[string]string)
 				messages    = make(map[string]int)
+				channel string
+				bot bool
 			)
 
-			// If there's a specified channel, use it in the query
+			for _, o := range i.ApplicationCommandData().Options {
+				switch o.Type {
+				case discordgo.ApplicationCommandOptionChannel:
+					channel = o.ChannelValue(nil).ID
+				case discordgo.ApplicationCommandOptionBoolean:
+					bot = o.BoolValue()
+				}
+			}
 
-			if len(i.ApplicationCommandData().Options) > 0 {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.ApplicationCommandData().Options[0].ChannelValue(s).ID)
+			// If there's a specified channel, use it in the query
+			if channel != "" {
+				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, channel)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}
@@ -244,8 +320,15 @@ var (
 				}
 
 				if m.Author != nil {
-					people[m.Author.ID] = m.Author.Username
-					messages[m.Author.ID]++
+					if bot {
+						people[m.Author.ID] = m.Author.Username
+						messages[m.Author.ID]++
+					} else {
+						if m.Author.Bot {
+							people[m.Author.ID] = m.Author.Username
+							messages[m.Author.ID]++
+						}
+					}
 				}
 			}
 
@@ -273,11 +356,22 @@ var (
 				people      = make(map[string]string)
 				messages    = make(map[string]int)
 				charPerMex  = make(map[string]int)
+				channel string
+				bot bool
 			)
 
+			for _, o := range i.ApplicationCommandData().Options {
+				switch o.Type {
+				case discordgo.ApplicationCommandOptionChannel:
+					channel = o.ChannelValue(nil).ID
+				case discordgo.ApplicationCommandOptionBoolean:
+					bot = o.BoolValue()
+				}
+			}
+
 			// If there's a specified channel, use it in the query
-			if len(i.ApplicationCommandData().Options) > 0 {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.ApplicationCommandData().Options[0].ChannelValue(s).ID)
+			if channel != "" {
+				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, channel)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}
@@ -300,9 +394,17 @@ var (
 				}
 
 				if m.Author != nil {
-					characters[m.Author.ID] += len(m.Content)
-					people[m.Author.ID] = m.Author.Username
-					messages[m.Author.ID]++
+					if bot {
+						characters[m.Author.ID] += len(m.Content)
+						people[m.Author.ID] = m.Author.Username
+						messages[m.Author.ID]++
+					} else {
+						if !m.Author.Bot {
+							characters[m.Author.ID] += len(m.Content)
+							people[m.Author.ID] = m.Author.Username
+							messages[m.Author.ID]++
+						}
+					}
 				}
 			}
 
@@ -330,11 +432,22 @@ var (
 				messageJSON []byte
 				m           discordgo.Message
 				words       = make(map[string]int)
+				channel string
+				bot bool
 			)
 
+			for _, o := range i.ApplicationCommandData().Options {
+				switch o.Type {
+				case discordgo.ApplicationCommandOptionChannel:
+					channel = o.ChannelValue(nil).ID
+				case discordgo.ApplicationCommandOptionBoolean:
+					bot = o.BoolValue()
+				}
+			}
+
 			// If there's a specified channel, use it in the query
-			if len(i.ApplicationCommandData().Options) > 0 {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, i.ApplicationCommandData().Options[0].ChannelValue(s).ID)
+			if channel != "" {
+				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, channel)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}
@@ -356,10 +469,21 @@ var (
 					continue
 				}
 
-				mSplitted := strings.Fields(strings.ToLower(m.Content))
-				for _, word := range mSplitted {
-					if utf8.RuneCountInString(word) > 3 {
-						words[word]++
+				if bot {
+					mSplitted := strings.Fields(strings.ToLower(m.Content))
+					for _, word := range mSplitted {
+						if utf8.RuneCountInString(word) > 3 {
+							words[word]++
+						}
+					}
+				} else {
+					if m.Author != nil && !m.Author.Bot {
+						mSplitted := strings.Fields(strings.ToLower(m.Content))
+						for _, word := range mSplitted {
+							if utf8.RuneCountInString(word) > 3 {
+								words[word]++
+							}
+						}
 					}
 				}
 			}

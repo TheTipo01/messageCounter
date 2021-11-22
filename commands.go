@@ -136,8 +136,8 @@ var (
 				cont        int
 				characters  = make(map[string]int)
 				people      = make(map[string]string)
-				channel string
-				bot bool
+				channel     string
+				bot         bool
 			)
 
 			for _, o := range i.ApplicationCommandData().Options {
@@ -209,9 +209,9 @@ var (
 				words       = make(map[string]int)
 				people      = make(map[string]string)
 				// Match non-space character sequences.
-				re = regexp.MustCompile(`[\S]+`)
+				re      = regexp.MustCompile(`[\S]+`)
 				channel string
-				bot bool
+				bot     bool
 			)
 
 			for _, o := range i.ApplicationCommandData().Options {
@@ -282,8 +282,8 @@ var (
 				cont        int
 				people      = make(map[string]string)
 				messages    = make(map[string]int)
-				channel string
-				bot bool
+				channel     string
+				bot         bool
 			)
 
 			for _, o := range i.ApplicationCommandData().Options {
@@ -324,7 +324,7 @@ var (
 						people[m.Author.ID] = m.Author.Username
 						messages[m.Author.ID]++
 					} else {
-						if m.Author.Bot {
+						if !m.Author.Bot {
 							people[m.Author.ID] = m.Author.Username
 							messages[m.Author.ID]++
 						}
@@ -356,8 +356,8 @@ var (
 				people      = make(map[string]string)
 				messages    = make(map[string]int)
 				charPerMex  = make(map[string]int)
-				channel string
-				bot bool
+				channel     string
+				bot         bool
 			)
 
 			for _, o := range i.ApplicationCommandData().Options {
@@ -432,8 +432,8 @@ var (
 				messageJSON []byte
 				m           discordgo.Message
 				words       = make(map[string]int)
-				channel string
-				bot bool
+				channel     string
+				bot         bool
 			)
 
 			for _, o := range i.ApplicationCommandData().Options {
@@ -504,19 +504,12 @@ var (
 			_ = png.Encode(&imgPng, img)
 
 			// Send it in a channel
-			sentImg, err := s.ChannelFileSend(i.ChannelID, "wordcloud.png", &imgPng)
+			_, err = s.ChannelFileSend(i.ChannelID, "wordcloud.png", &imgPng)
 			if err != nil {
 				lit.Error("Error while sending image " + err.Error())
 				return
 			}
-
-			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).SetColor(0x7289DA).SetImage(m.Attachments[0].URL).
-				MessageEmbed, i.Interaction)
-
-			err = s.ChannelMessageDelete(sentImg.ChannelID, sentImg.ID)
-			if err != nil {
-				lit.Error("Error while deleting sent image " + err.Error())
-			}
+			// TODO: maybe do something about the interaction timing out
 		},
 
 		"undelete": func(s *discordgo.Session, i *discordgo.InteractionCreate) {

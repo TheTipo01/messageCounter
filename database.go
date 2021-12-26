@@ -5,14 +5,13 @@ import (
 	"github.com/bwmarrin/lit"
 	"github.com/go-co-op/gocron"
 	"github.com/goccy/go-json"
-	"strings"
 	"time"
 )
 
 const (
-	tblMessages = "CREATE TABLE IF NOT EXISTS `messages`( `guildID` varchar(18) CHARACTER SET utf8mb4 NOT NULL, `channelID` varchar(18) CHARACTER SET utf8mb4 NOT NULL, `messageID` varchar(18) CHARACTER SET utf8mb4 NOT NULL, `message` text CHARACTER SET utf8mb4 NOT NULL, `deleted` tinyint(1) NOT NULL DEFAULT 0, PRIMARY KEY (`messageID`) USING BTREE) DEFAULT CHARSET=utf8;"
+	tblMessages = "CREATE TABLE IF NOT EXISTS `messages`( `guildID` varchar(18) CHARACTER SET utf8mb4 NOT NULL, `channelID` varchar(18) CHARACTER SET utf8mb4 NOT NULL, `messageID` varchar(18) CHARACTER SET utf8mb4 NOT NULL, `authorID` varchar(18) DEFAULT NULL, `message` longtext CHARACTER SET utf8mb4 NOT NULL CHECK (json_valid(`message`)), `deleted` tinyint(1) unsigned NOT NULL DEFAULT 0, PRIMARY KEY (`messageID`) USING BTREE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;"
 	tblUsers    = "CREATE TABLE IF NOT EXISTS `users`( `id` varchar(18) NOT NULL, `nickname` varchar(32) NOT NULL, PRIMARY KEY (`id`)) DEFAULT CHARSET=utf8mb4;"
-	tblServer   = "CREATE TABLE IF NOT EXISTS `server`( `id` varchar(18) NOT NULL, `name` varchar(100) NOT NULL, PRIMARY KEY (`id`)) DEFAULT CHARSET=utf8mb4;"
+	tblServers  = "CREATE TABLE IF NOT EXISTS `servers`( `id` varchar(18) NOT NULL, `name` varchar(100) NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
 	tblChannels = "CREATE TABLE IF NOT EXISTS `channels`( `id` varchar(18) NOT NULL, `name` text NOT NULL DEFAULT '', `serverId` varchar(18) NOT NULL, PRIMARY KEY (`id`), KEY `FK_channels_server` (`serverId`), CONSTRAINT `FK_channels_server` FOREIGN KEY (`serverId`) REFERENCES `server` (`id`)) DEFAULT CHARSET=utf8mb4;"
 	tblPings    = "CREATE TABLE IF NOT EXISTS `pings`( `id` int(11) NOT NULL AUTO_INCREMENT, `menzionatoreId` varchar(18) NOT NULL, `menzionatoId` varchar(18) NOT NULL, `channelId` varchar(18) NOT NULL, `serverId` varchar(18) NOT NULL, `timestamp` datetime NOT NULL, `messageId` varchar(18) NOT NULL, PRIMARY KEY (`id`), KEY `FK_pings_channels` (`channelId`), KEY `FK_pings_server` (`serverId`), KEY `FK_pings_users` (`menzionatoreId`), KEY `FK_pings_users_2` (`menzionatoId`), KEY `messageId` (`messageId`), CONSTRAINT `FK_pings_channels` FOREIGN KEY (`channelId`) REFERENCES `channels` (`id`), CONSTRAINT `FK_pings_messages` FOREIGN KEY (`messageId`) REFERENCES `messages` (`messageID`), CONSTRAINT `FK_pings_server` FOREIGN KEY (`serverId`) REFERENCES `server` (`id`), CONSTRAINT `FK_pings_users` FOREIGN KEY (`menzionatoreId`) REFERENCES `users` (`id`), CONSTRAINT `FK_pings_users_2` FOREIGN KEY (`menzionatoId`) REFERENCES `users` (`id`)) DEFAULT CHARSET=utf8mb4;"
 	tblConfig   = "CREATE TABLE IF NOT EXISTS `config`( `id` int(11) NOT NULL AUTO_INCREMENT, `guildID` varchar(18) CHARACTER SET utf8mb4 NOT NULL DEFAULT '0', `channelID` varchar(18) CHARACTER SET utf8mb4 NOT NULL DEFAULT '0', `channelToID` varchar(18) CHARACTER SET utf8mb4 NOT NULL DEFAULT '0', `offset` int(11) DEFAULT 0, PRIMARY KEY (`id`), KEY `FK_config_server` (`guildID`), KEY `FK_config_channels` (`channelID`), KEY `FK_config_channels_2` (`channelToID`), CONSTRAINT `FK_config_channels` FOREIGN KEY (`channelID`) REFERENCES `channels` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT `FK_config_channels_2` FOREIGN KEY (`channelToID`) REFERENCES `channels` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT `FK_config_server` FOREIGN KEY (`guildID`) REFERENCES `server` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;"
@@ -31,8 +30,16 @@ func execQuery(query ...string) {
 
 // addMessage adds a message to the db
 func addMessage(m *discordgo.Message) {
+	var err error
 	inJSON, _ := json.Marshal(m)
-	_, err := db.Exec("INSERT INTO messages (guildID, channelID, messageID, message) VALUES (?, ?, ?, ?)", m.GuildID, m.ChannelID, m.ID, string(inJSON))
+
+	if m.Author != nil {
+		insertAuthor(m)
+		_, err = db.Exec("INSERT INTO messages (guildID, channelID, messageID, authorID, message) VALUES (?, ?, ?, ?, ?)", m.GuildID, m.ChannelID, m.ID, m.Author.ID, inJSON)
+	} else {
+		_, err = db.Exec("INSERT INTO messages (guildID, channelID, messageID, message) VALUES (?, ?, ?, ?)", m.GuildID, m.ChannelID, m.ID, inJSON)
+	}
+
 	if err != nil {
 		lit.Error("Error while inserting message into db, %s", err)
 	}
@@ -40,7 +47,7 @@ func addMessage(m *discordgo.Message) {
 
 func deleteMessage(s *discordgo.Session, m *discordgo.Message) {
 	// Set delete flag up
-	_, err := db.Exec("UPDATE messages SET deleted=1 WHERE guildID=? AND channelID=? AND messageID=?", m.GuildID, m.ChannelID, m.ID)
+	_, err := db.Exec("UPDATE messages SET deleted=1 WHERE messageID=?", m.ID)
 	if err != nil {
 		lit.Error("Error updating row from the database, %s", err)
 	}
@@ -51,7 +58,7 @@ func deleteMessage(s *discordgo.Session, m *discordgo.Message) {
 		oldMessage discordgo.Message
 	)
 
-	_ = db.QueryRow("SELECT message FROM messages WHERE guildID=? AND channelID=? AND messageID=?", m.GuildID, m.ChannelID, m.ID).Scan(&message)
+	_ = db.QueryRow("SELECT message FROM messages WHERE messageID=?", m.ID).Scan(&message)
 	_ = json.Unmarshal(message, &oldMessage)
 
 	if oldMessage.MentionEveryone {
@@ -84,13 +91,13 @@ func updateMessage(s *discordgo.Session, m *discordgo.Message) {
 		oldMessage discordgo.Message
 	)
 
-	_ = db.QueryRow("SELECT message FROM messages WHERE guildID=? AND channelID=? AND messageID=?", m.GuildID, m.ChannelID, m.ID).Scan(&message)
+	_ = db.QueryRow("SELECT message FROM messages WHERE messageID=?", m.ID).Scan(&message)
 	_ = json.Unmarshal(message, &oldMessage)
 
 	// Update existing message
 	jsonMessage, _ := json.Marshal(m)
 
-	_, err := db.Exec("UPDATE messages SET message=? WHERE guildID=? AND channelID=? AND messageID=?", string(jsonMessage), m.GuildID, m.ChannelID, m.ID)
+	_, err := db.Exec("UPDATE messages SET message=? WHERE messageID=?", jsonMessage, m.ID)
 	if err != nil {
 		lit.Error("Error updating row from the database, %s", err)
 	}
@@ -144,51 +151,45 @@ func insertData(s *discordgo.Session, message *discordgo.Message, mention *disco
 	// Guild
 	g, err := s.Guild(message.GuildID)
 	if err == nil {
-		_, err = db.Exec("INSERT INTO server (id, name) VALUES(?, ?)", g.ID, g.Name)
+		_, err = db.Exec("INSERT IGNORE INTO servers (id, name) VALUES(?, ?)", g.ID, g.Name)
 		if err != nil {
-			str = err.Error()
-			if !strings.HasPrefix(str, "Error 1062: Duplicate entry") {
-				lit.Error("Error inserting channel in the database, %s", str)
-			}
+			lit.Error("Error inserting channel in the database, %s", str)
 		}
 	} else {
 		lit.Error("cannot create guild, %s", err)
 	}
 
 	// Author insert
-	_, err = db.Exec("INSERT INTO users (id, nickname) VALUES(?, ?)", message.Author.ID, message.Author.Username)
-	if err != nil {
-		str = err.Error()
-		if !strings.HasPrefix(str, "Error 1062: Duplicate entry") {
-			lit.Error("Error inserting user in the database, %s", str)
-		}
-	}
+	insertAuthor(message)
 
 	// Mentioned
 	if mention != nil {
-		_, err = db.Exec("INSERT INTO users (id, nickname) VALUES(?, ?)", mention.ID, mention.Username)
+		_, err = db.Exec("INSERT IGNORE INTO users (id, nickname) VALUES(?, ?)", mention.ID, mention.Username)
 		if err != nil {
-			str = err.Error()
-			if !strings.HasPrefix(str, "Error 1062: Duplicate entry") {
-				lit.Error("Error inserting user in the database, %s", str)
-			}
+			lit.Error("Error inserting user in the database, %s", str)
 		}
 	}
 
 	// Channel
 	channel, err := s.Channel(message.ChannelID)
 	if err == nil {
-		_, err = db.Exec("INSERT INTO channels (id, name, serverId) VALUES(?, ?, ?)", channel.ID, channel.Name, channel.GuildID)
+		_, err = db.Exec("INSERT IGNORE INTO channels (id, name, serverId) VALUES(?, ?, ?)", channel.ID, channel.Name, channel.GuildID)
 		if err != nil {
-			str = err.Error()
-			if !strings.HasPrefix(str, "Error 1062: Duplicate entry") {
-				lit.Error("Error inserting channel in the database, %s", str)
-			}
+			lit.Error("Error inserting channel in the database, %s", str)
 		}
 	} else {
 		lit.Error("cannot create channel, %s", err)
 	}
 
+}
+
+func insertAuthor(message *discordgo.Message) {
+	if message.Author != nil {
+		_, err := db.Exec("INSERT IGNORE INTO users (id, nickname) VALUES(?, ?)", message.Author.ID, message.Author.Username)
+		if err != nil {
+			lit.Error("Error inserting user in the database, %s", err.Error())
+		}
+	}
 }
 
 // Every Monday at midnight sends a random message for configured guilds

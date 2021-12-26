@@ -59,7 +59,7 @@ func init() {
 	}
 
 	// Initialize tables
-	execQuery(tblMessages, tblUsers, tblServer, tblChannels, tblPings, tblConfig)
+	execQuery(tblMessages, tblUsers, tblServers, tblChannels, tblPings, tblConfig)
 
 	// And add the everyone user to the table, as we use that for logging @everyone and @here
 	_, err = db.Exec("INSERT INTO users (id, nickname) VALUES(?, ?)", "everyone", "everyone")

@@ -132,7 +132,7 @@ var (
 				err         error
 				messageJSON []byte
 				toSend      string
-				m           discordgo.Message
+				m           LightMessage
 				cont        int
 				characters  = make(map[string]int)
 				people      = make(map[string]string)
@@ -151,7 +151,7 @@ var (
 
 			// If there's a specified channel, use it in the query
 			if channel != "" {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, channel)
+				mex, err = db.Query("SELECT message FROM messages WHERE channelID=?", channel)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}
@@ -173,7 +173,7 @@ var (
 					continue
 				}
 
-				if m.Author != nil {
+				if m.Author.ID != "" {
 					if bot {
 						characters[m.Author.ID] += len(m.Content)
 						people[m.Author.ID] = m.Author.Username
@@ -204,7 +204,7 @@ var (
 				err         error
 				messageJSON []byte
 				toSend      string
-				m           discordgo.Message
+				m           LightMessage
 				cont        int
 				words       = make(map[string]int)
 				people      = make(map[string]string)
@@ -225,7 +225,7 @@ var (
 
 			// If there's a specified channel, use it in the query
 			if channel != "" {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, channel)
+				mex, err = db.Query("SELECT message FROM messages WHERE channelID=?", channel)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}
@@ -247,7 +247,7 @@ var (
 					continue
 				}
 
-				if m.Author != nil {
+				if m.Author.ID != "" {
 					if bot {
 						people[m.Author.ID] = m.Author.Username
 						words[m.Author.ID] += len(re.FindAllString(m.Content, -1))
@@ -278,7 +278,7 @@ var (
 				err         error
 				messageJSON []byte
 				toSend      string
-				m           discordgo.Message
+				m           LightMessage
 				cont        int
 				people      = make(map[string]string)
 				messages    = make(map[string]int)
@@ -297,7 +297,7 @@ var (
 
 			// If there's a specified channel, use it in the query
 			if channel != "" {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, channel)
+				mex, err = db.Query("SELECT message FROM messages WHERE channelID=?", channel)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}
@@ -319,7 +319,7 @@ var (
 					continue
 				}
 
-				if m.Author != nil {
+				if m.Author.ID != "" {
 					if bot {
 						people[m.Author.ID] = m.Author.Username
 						messages[m.Author.ID]++
@@ -350,7 +350,7 @@ var (
 				err         error
 				messageJSON []byte
 				toSend      string
-				m           discordgo.Message
+				m           LightMessage
 				cont        int
 				characters  = make(map[string]int)
 				people      = make(map[string]string)
@@ -371,7 +371,7 @@ var (
 
 			// If there's a specified channel, use it in the query
 			if channel != "" {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, channel)
+				mex, err = db.Query("SELECT message FROM messages WHERE channelID=?", channel)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}
@@ -393,7 +393,7 @@ var (
 					continue
 				}
 
-				if m.Author != nil {
+				if m.Author.ID != "" {
 					if bot {
 						characters[m.Author.ID] += len(m.Content)
 						people[m.Author.ID] = m.Author.Username
@@ -430,7 +430,7 @@ var (
 				mex         *sql.Rows
 				err         error
 				messageJSON []byte
-				m           discordgo.Message
+				m           LightMessage
 				words       = make(map[string]int)
 				channel     string
 				bot         bool
@@ -447,7 +447,7 @@ var (
 
 			// If there's a specified channel, use it in the query
 			if channel != "" {
-				mex, err = db.Query("SELECT message FROM messages WHERE guildID=? AND channelID=?", i.GuildID, channel)
+				mex, err = db.Query("SELECT message FROM messages WHERE channelID=?", channel)
 			} else {
 				mex, err = db.Query("SELECT message FROM messages WHERE guildID=?", i.GuildID)
 			}
@@ -477,7 +477,7 @@ var (
 						}
 					}
 				} else {
-					if m.Author != nil && !m.Author.Bot {
+					if m.Author.ID != "" && !m.Author.Bot {
 						mSplitted := strings.Fields(strings.ToLower(m.Content))
 						for _, word := range mSplitted {
 							if utf8.RuneCountInString(word) > 3 {
@@ -530,7 +530,7 @@ var (
 
 			toSend = "Last " + strconv.Itoa(int(number)) + " deleted messages:\n```"
 
-			rows, err := db.Query("SELECT message FROM messages WHERE deleted = 1 AND guildID=? AND channelID=? ORDER BY messageID DESC LIMIT ?", i.GuildID, i.ChannelID, number)
+			rows, err := db.Query("SELECT message FROM messages WHERE deleted = 1 AND channelID=? ORDER BY messageID DESC LIMIT ?", i.ChannelID, number)
 			if err != nil {
 				lit.Error("Can't query database, %s", err)
 				return

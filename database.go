@@ -143,17 +143,14 @@ func updateMessage(s *discordgo.Session, m *discordgo.Message) {
 
 // Populates channels, guilds and users tables
 func insertData(s *discordgo.Session, message *discordgo.Message, mention *discordgo.User) {
-	var (
-		err error
-		str string
-	)
+	var err error
 
 	// Guild
 	g, err := s.Guild(message.GuildID)
 	if err == nil {
 		_, err = db.Exec("INSERT IGNORE INTO servers (id, name) VALUES(?, ?)", g.ID, g.Name)
 		if err != nil {
-			lit.Error("Error inserting channel in the database, %s", str)
+			lit.Error("Error inserting channel in the database, %s", err)
 		}
 	} else {
 		lit.Error("cannot create guild, %s", err)
@@ -166,7 +163,7 @@ func insertData(s *discordgo.Session, message *discordgo.Message, mention *disco
 	if mention != nil {
 		_, err = db.Exec("INSERT IGNORE INTO users (id, nickname) VALUES(?, ?)", mention.ID, mention.Username)
 		if err != nil {
-			lit.Error("Error inserting user in the database, %s", str)
+			lit.Error("Error inserting user in the database, %s", err)
 		}
 	}
 
@@ -175,7 +172,7 @@ func insertData(s *discordgo.Session, message *discordgo.Message, mention *disco
 	if err == nil {
 		_, err = db.Exec("INSERT IGNORE INTO channels (id, name, serverId) VALUES(?, ?, ?)", channel.ID, channel.Name, channel.GuildID)
 		if err != nil {
-			lit.Error("Error inserting channel in the database, %s", str)
+			lit.Error("Error inserting channel in the database, %s", err)
 		}
 	} else {
 		lit.Error("cannot create channel, %s", err)

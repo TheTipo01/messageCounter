@@ -123,8 +123,13 @@ func main() {
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	addMessage(m.Message)
 
-	if server[m.GuildID].numberOfMessages++; server[m.GuildID].numberOfMessages == 69419 {
+	server[m.GuildID].numberOfMessages++
+
+	switch server[m.GuildID].numberOfMessages {
+	case 69419:
 		_, _ = s.ChannelMessageSend(m.ChannelID, "nice")
+	case 99999:
+		_, _ = s.ChannelMessageSend(m.ChannelID, "So guys, we did it. We finally reached 100k messages")
 	}
 }
 

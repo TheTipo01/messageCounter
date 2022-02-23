@@ -21,23 +21,17 @@
         <tbody>
         <?php
 
-        $connection = mysqli_connect("ip", "user", "pass", "database");
-        $query = "select `channels`.`name` AS `canale`,`server`.`name` AS `serverName`,`users`.`nickname` AS `menzionato`,`users2`.`nickname` AS `menzionatore`,`pings`.`timestamp` AS `TIMESTAMP` from ((((`channels` join `pings`) join `server`) join `users`) join `users` `users2`) where `pings`.`menzionatoreId` = `users2`.`id` and `pings`.`menzionatoId` = `users`.`id` and `pings`.`channelId` = `channels`.`id` and `pings`.`serverId` = `server`.`id` order by `pings`.`timestamp` desc";
-        $result = mysqli_query($connection, $query);
+        $connection = new mysqli("ip", "user", "pass", "database");
+        $query = "SELECT channels.name AS canale, servers.name AS serverName, pings.TIMESTAMP AS timestamp, users1.nickname AS menzionato, users2.nickname AS menzionatore FROM pings JOIN servers ON pings.serverId = servers.id JOIN users AS users1 ON pings.menzionatoId = users1.id JOIN users AS users2 ON pings.menzionatoreId = users2.id JOIN channels ON pings.channelId = channels.id ORDER BY pings.timestamp DESC";
+        $result = $connection->query($query);
 
-        if (mysqli_num_rows($result) != 0) {
-            while ($row = mysqli_fetch_array($result)) {
-                echo "<tr>";
-                echo "<td>$row[menzionatore]</td>";
-                echo "<td>$row[menzionato]</td>";
-                echo "<td>$row[TIMESTAMP]</td>";
-                echo "<td>$row[serverName]</td>";
-                echo "<td>$row[canale]</td>";
-                echo "</tr>";
+        if ($result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                echo "<tr><td>".$row["menzionatore"]."</td>"."<td>".$row["menzionato"]."</td>"."<td>".$row["timestamp"]."</td>"
+                    ."<td>".$row["serverName"]."</td>"."<td>".$row["canale"]."</td>"."</tr>";
             }
-        } else {
-            mysqli_close($connection);
         }
+        $connection->close();
         ?>
         </tbody>
     </table>

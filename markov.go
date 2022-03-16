@@ -52,7 +52,7 @@ func buildModel(guildID string) *gomarkov.Chain {
 
 // saveModel updates the model on the database
 func saveModel(guildID string) {
-	data, _ := json.Marshal(server[guildID].model)
+	data, _ := server[guildID].model.MarshalJSON()
 
 	_, err := db.Exec("UPDATE servers SET model=? WHERE id=?", data, guildID)
 

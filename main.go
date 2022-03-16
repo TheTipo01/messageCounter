@@ -156,7 +156,7 @@ func guildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
 			lit.Error("Error inserting into the database: %s", err.Error())
 		}
 
-		server[g.ID] = &Server{numberOfMessages: 0, model: &gomarkov.Chain{}}
+		server[g.ID] = &Server{numberOfMessages: 0, model: gomarkov.NewChain(1)}
 	}
 
 	for _, c := range g.Channels {

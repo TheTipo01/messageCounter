@@ -6,6 +6,7 @@ import (
 	"github.com/bwmarrin/lit"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/kkyr/fig"
+	"github.com/mb-14/gomarkov"
 	"os"
 	"os/signal"
 	"strings"
@@ -62,12 +63,9 @@ func init() {
 	execQuery(tblMessages, tblUsers, tblServers, tblChannels, tblPings, tblConfig)
 
 	// And add the everyone user to the table, as we use that for logging @everyone and @here
-	_, err = db.Exec("INSERT INTO users (id, nickname) VALUES(?, ?)", "everyone", "everyone")
+	_, err = db.Exec("INSERT IGNORE INTO users (id, nickname) VALUES(?, ?)", "everyone", "everyone")
 	if err != nil {
-		str := err.Error()
-		if !strings.HasPrefix(str, "Error 1062: Duplicate entry") {
-			lit.Error("Error inserting user everyone in the database, %s", str)
-		}
+		lit.Error("Error inserting user everyone in the database, %s", err.Error())
 	}
 }
 
@@ -107,6 +105,7 @@ func main() {
 	}
 
 	loadScheduler(dg)
+	loadModel()
 
 	// Wait here until CTRL-C or other term signal is received.
 	lit.Info("messageCounter is now running. Press CTRL-C to exit.")
@@ -152,12 +151,16 @@ func guildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
 	)
 
 	if server[g.ID] == nil {
-		server[g.ID] = &Server{numberOfMessages: 0}
+		_, err = db.Exec("INSERT INTO servers (id, name, model) VALUES(?, ?, '')", g.ID, g.Name)
+		if err != nil {
+			lit.Error("Error inserting into the database: %s", err.Error())
+		}
+
+		server[g.ID] = &Server{numberOfMessages: 0, model: &gomarkov.Chain{}}
 	}
 
 	for _, c := range g.Channels {
 		if c.Type != discordgo.ChannelTypeGuildVoice && c.Type != discordgo.ChannelTypeGuildCategory {
-
 			for {
 				_ = db.QueryRow("SELECT messageID FROM messages WHERE guildID=? AND channelID=? ORDER BY messageID LIMIT 1", c.GuildID, c.ID).Scan(&beforeID)
 				messages, err = s.ChannelMessages(c.ID, 100, beforeID, "", "")
@@ -190,12 +193,6 @@ func guildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
 	if offset != 0 {
 		server[g.ID].numberOfMessages += offset
 		lit.Debug("Added offset of %d on guild \"%s\". New total of message %d", offset, g.Name, server[g.ID].numberOfMessages)
-	}
-
-	server[g.ID].model = loadModel(g.ID)
-	if server[g.ID].model == nil {
-		lit.Info("Model for guild %s doesn't exist. Building it right now", g.ID)
-		server[g.ID].model = buildModel(g.ID)
 	}
 
 	saveModel(g.ID)

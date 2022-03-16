@@ -37,6 +37,11 @@ func addMessage(m *discordgo.Message) {
 	if m.Author != nil {
 		insertAuthor(m)
 		_, err = db.Exec("INSERT INTO messages (guildID, channelID, messageID, authorID, message) VALUES (?, ?, ?, ?, ?)", m.GuildID, m.ChannelID, m.ID, m.Author.ID, inJSON)
+
+		if !m.Author.Bot {
+			server[m.GuildID].model.Add(strings.Split(m.Content, " "))
+			saveModel(m.GuildID)
+		}
 	} else {
 		_, err = db.Exec("INSERT INTO messages (guildID, channelID, messageID, message) VALUES (?, ?, ?, ?)", m.GuildID, m.ChannelID, m.ID, inJSON)
 	}
@@ -45,7 +50,6 @@ func addMessage(m *discordgo.Message) {
 		lit.Error("Error while inserting message into db, %s", err)
 	}
 
-	server[m.GuildID].model.Add(strings.Split(m.Content, " "))
 }
 
 func deleteMessage(s *discordgo.Session, m *discordgo.Message) {

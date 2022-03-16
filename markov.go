@@ -61,19 +61,26 @@ func saveModel(guildID string) {
 	}
 }
 
-// loadModel loads the model from the db or builds it if it doesn't exist
-func loadModel(guildID string) *gomarkov.Chain {
+// loadModel loads the model from the db
+func loadModel() {
 	var (
-		data  []byte
-		chain gomarkov.Chain
+		data    []byte
+		chain   gomarkov.Chain
+		guildID string
 	)
 
-	_ = db.QueryRow("SELECT model FROM servers WHERE id=?", guildID).Scan(&data)
+	rows, _ := db.Query("SELECT model, id FROM servers")
 
-	if len(data) == 0 {
-		return nil
-	} else {
-		_ = json.Unmarshal(data, &chain)
-		return &chain
+	for rows.Next() {
+		_ = rows.Scan(&data, &guildID)
+
+		server[guildID] = &Server{numberOfMessages: 0, model: nil}
+
+		if len(data) == 0 {
+			server[guildID].model = buildModel(guildID)
+		} else {
+			_ = json.Unmarshal(data, &chain)
+			server[guildID].model = &chain
+		}
 	}
 }

@@ -123,10 +123,6 @@ var (
 			},
 		},
 		{
-			Name:        "rebuildmodel",
-			Description: "Rebuilds the markov model for the current guild",
-		},
-		{
 			Name:        "markov",
 			Description: "Generates a message from the current markov chain",
 		},
@@ -578,14 +574,6 @@ var (
 
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Undelete", strings.TrimSuffix(toSend, "\n")+"```").
 				SetColor(0x7289DA).MessageEmbed, i.Interaction)
-		},
-
-		"rebuildmodel": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Successful", "Operation started, this may (and will) take a while").
-				SetColor(0x7289DA).MessageEmbed, i.Interaction)
-
-			server[i.GuildID].model = buildModel(i.GuildID)
-			saveModel(i.GuildID)
 		},
 
 		"markov": func(s *discordgo.Session, i *discordgo.InteractionCreate) {

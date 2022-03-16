@@ -52,12 +52,23 @@ func buildModel(guildID string) *gomarkov.Chain {
 
 // saveModel updates the model on the database
 func saveModel(guildID string) {
-	data, _ := json.Marshal(server[guildID].model)
+	if server[guildID] != nil {
+		data, _ := json.Marshal(server[guildID].model)
 
-	_, err := db.Exec("UPDATE servers SET model=? WHERE id=?", data, guildID)
+		_, err := db.Exec("UPDATE servers SET model=? WHERE id=?", data, guildID)
 
-	if err != nil {
-		lit.Error("Error updating model: %s", err.Error())
+		if err != nil {
+			lit.Error("Error updating model: %s", err.Error())
+		}
+	} else {
+		lit.Warn("Server map for guild %s is nil", guildID)
+	}
+}
+
+// saveAllModels saves all the models in the map server
+func saveAllModels() {
+	for guildID, _ := range server {
+		saveModel(guildID)
 	}
 }
 

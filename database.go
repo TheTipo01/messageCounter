@@ -40,7 +40,6 @@ func addMessage(m *discordgo.Message) {
 
 		if !m.Author.Bot {
 			server[m.GuildID].model.Add(strings.Split(m.Content, " "))
-			saveModel(m.GuildID)
 		}
 	} else {
 		_, err = db.Exec("INSERT INTO messages (guildID, channelID, messageID, message) VALUES (?, ?, ?, ?)", m.GuildID, m.ChannelID, m.ID, inJSON)
@@ -249,6 +248,10 @@ func loadScheduler(s *discordgo.Session) {
 
 		lit.Debug("Added cronjob for server %s", guildID)
 	}
+
+	_, _ = cron.Every(5).Minute().Do(func() {
+		saveAllModels()
+	})
 
 	// And start the scheduler
 	cron.StartAsync()

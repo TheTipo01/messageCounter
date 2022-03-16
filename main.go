@@ -115,6 +115,9 @@ func main() {
 
 	// Cleanly close down the Discord session.
 	_ = dg.Close()
+
+	saveAllModels()
+
 	// And the database connection
 	_ = db.Close()
 }

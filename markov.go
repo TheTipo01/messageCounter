@@ -65,7 +65,6 @@ func saveModel(guildID string) {
 func loadModel() {
 	var (
 		data    []byte
-		chain   gomarkov.Chain
 		guildID string
 	)
 
@@ -74,13 +73,12 @@ func loadModel() {
 	for rows.Next() {
 		_ = rows.Scan(&data, &guildID)
 
-		server[guildID] = &Server{numberOfMessages: 0, model: nil}
+		server[guildID] = &Server{numberOfMessages: 0, model: &gomarkov.Chain{}}
 
 		if len(data) == 0 {
 			server[guildID].model = buildModel(guildID)
 		} else {
-			_ = json.Unmarshal(data, &chain)
-			server[guildID].model = &chain
+			_ = json.Unmarshal(data, &server[guildID].model)
 		}
 	}
 }

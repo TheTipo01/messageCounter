@@ -5,6 +5,7 @@ import (
 	"github.com/bwmarrin/lit"
 	"github.com/go-co-op/gocron"
 	"github.com/goccy/go-json"
+	"strings"
 	"time"
 )
 
@@ -43,6 +44,8 @@ func addMessage(m *discordgo.Message) {
 	if err != nil {
 		lit.Error("Error while inserting message into db, %s", err)
 	}
+
+	server[m.GuildID].model.Add(strings.Split(m.Content, " "))
 }
 
 func deleteMessage(s *discordgo.Session, m *discordgo.Message) {

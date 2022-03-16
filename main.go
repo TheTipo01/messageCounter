@@ -191,6 +191,14 @@ func guildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
 		server[g.ID].numberOfMessages += offset
 		lit.Debug("Added offset of %d on guild \"%s\". New total of message %d", offset, g.Name, server[g.ID].numberOfMessages)
 	}
+
+	server[g.ID].model = loadModel(g.ID)
+	if server[g.ID].model == nil {
+		lit.Info("Model for guild %s doesn't exist. Building it right now", g.ID)
+		server[g.ID].model = buildModel(g.ID)
+	}
+
+	saveModel(g.ID)
 }
 
 func ready(s *discordgo.Session, _ *discordgo.Ready) {

@@ -7,6 +7,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
 	"github.com/goccy/go-json"
+	"github.com/mb-14/gomarkov"
 	"github.com/psykhi/wordclouds"
 	"image/color"
 	"image/png"
@@ -120,6 +121,14 @@ var (
 					Required:    false,
 				},
 			},
+		},
+		{
+			Name:        "rebuildmodel",
+			Description: "Rebuilds the markov model for the current guild",
+		},
+		{
+			Name:        "markov",
+			Description: "Generates a message from the current markov chain",
 		},
 	}
 
@@ -568,6 +577,25 @@ var (
 			}
 
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Undelete", strings.TrimSuffix(toSend, "\n")+"```").
+				SetColor(0x7289DA).MessageEmbed, i.Interaction)
+		},
+
+		"rebuildmodel": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Successful", "Operation started, this may (and will) take a while").
+				SetColor(0x7289DA).MessageEmbed, i.Interaction)
+
+			server[i.GuildID].model = buildModel(i.GuildID)
+			saveModel(i.GuildID)
+		},
+
+		"markov": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			tokens := []string{gomarkov.StartToken}
+			for tokens[len(tokens)-1] != gomarkov.EndToken {
+				next, _ := server[i.GuildID].model.Generate(tokens[(len(tokens) - 1):])
+				tokens = append(tokens, next)
+			}
+
+			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Markov", strings.Join(tokens[1:len(tokens)-1], " ")).
 				SetColor(0x7289DA).MessageEmbed, i.Interaction)
 		},
 	}

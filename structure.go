@@ -1,8 +1,11 @@
 package main
 
+import "github.com/mb-14/gomarkov"
+
 // Server holds data about a guild
 type Server struct {
 	numberOfMessages int
+	model            *gomarkov.Chain
 }
 
 type kv struct {

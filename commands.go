@@ -126,6 +126,18 @@ var (
 			Name:        "markov",
 			Description: "Generates a message from the current markov chain",
 		},
+		{
+			Name:        "longest",
+			Description: "Links the longest messages",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionChannel,
+					Name:        "channel",
+					Description: "Optional channel for the stat",
+					Required:    false,
+				},
+			},
+		},
 	}
 
 	// Handler
@@ -584,6 +596,38 @@ var (
 			}
 
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Markov", strings.Join(tokens[1:len(tokens)-1], " ")).
+				SetColor(0x7289DA).MessageEmbed, i.Interaction)
+		},
+
+		"longest": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			var (
+				rows                 *sql.Rows
+				links                string
+				messageID, channelID string
+				cont                 int = 1
+				err                  error
+			)
+
+			if len(i.ApplicationCommandData().Options) > 0 {
+				rows, err = db.Query("SELECT messageID, channelID FROM messages WHERE channelID=? AND deleted=0 ORDER BY length(JSON_VALUE(message, '$.content')) DESC LIMIT 10", i.ApplicationCommandData().Options[0].ChannelValue(nil).ID)
+			} else {
+				rows, err = db.Query("SELECT messageID, channelID FROM messages WHERE guildID=? AND deleted=0 ORDER BY length(JSON_VALUE(message, '$.content')) DESC LIMIT 10", i.GuildID)
+			}
+
+			if err != nil {
+				lit.Error("Error querying database: %s", err.Error())
+				return
+			}
+
+			for rows.Next() {
+				err = rows.Scan(&messageID, &channelID)
+				if err == nil {
+					links += strconv.Itoa(cont) + ") https://discord.com/channels/" + i.GuildID + "/" + channelID + "/" + messageID + "\n"
+					cont++
+				}
+			}
+
+			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Longest", links).
 				SetColor(0x7289DA).MessageEmbed, i.Interaction)
 		},
 	}

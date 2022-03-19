@@ -67,7 +67,7 @@ func saveModel(guildID string) {
 
 // saveAllModels saves all the models in the map server
 func saveAllModels() {
-	for guildID, _ := range server {
+	for guildID := range server {
 		saveModel(guildID)
 	}
 }

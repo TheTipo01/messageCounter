@@ -601,18 +601,20 @@ var (
 
 		"longest": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			var (
-				rows  *sql.Rows
-				links string
-				data  []byte
-				m     discordgo.Message
-				cont  = 1
-				err   error
+				rows                 *sql.Rows
+				data                 []byte
+				channelID, messageID string
+				m                    LightMessage
+				cont                 = 1
+				max                  int
+				err                  error
+				embed                = NewEmbed().SetTitle(s.State.User.Username).SetColor(0x7289DA)
 			)
 
 			if len(i.ApplicationCommandData().Options) > 0 {
-				rows, err = db.Query("SELECT message FROM messages WHERE channelID=? AND deleted=0 ORDER BY length(JSON_VALUE(message, '$.content')) DESC LIMIT 10", i.ApplicationCommandData().Options[0].ChannelValue(nil).ID)
+				rows, err = db.Query("SELECT message, channelID, messageID FROM messages WHERE channelID=? AND deleted=0 ORDER BY length(JSON_VALUE(message, '$.content')) DESC LIMIT 10", i.ApplicationCommandData().Options[0].ChannelValue(nil).ID)
 			} else {
-				rows, err = db.Query("SELECT message FROM messages WHERE guildID=? AND deleted=0 ORDER BY length(JSON_VALUE(message, '$.content')) DESC LIMIT 10", i.GuildID)
+				rows, err = db.Query("SELECT message, channelID, messageID FROM messages WHERE guildID=? AND deleted=0 ORDER BY length(JSON_VALUE(message, '$.content')) DESC LIMIT 10", i.GuildID)
 			}
 
 			if err != nil {
@@ -621,16 +623,22 @@ var (
 			}
 
 			for rows.Next() {
-				err = rows.Scan(&data)
+				err = rows.Scan(&data, &channelID, &messageID)
 				if err == nil {
 					_ = json.Unmarshal(data, &m)
-					links += fmt.Sprintf("%d) [%s](https://discord.com/channels/%s/%s/%s) - sent by %s\n", cont, m.Content[0:50], m.GuildID, m.ChannelID, m.ID, m.Author.Username)
+
+					if len(m.Content) < 100 {
+						max = len(m.Content)
+					} else {
+						max = 100
+					}
+
+					embed.AddField(strconv.Itoa(cont), fmt.Sprintf("[%s](https://discord.com/channels/%s/%s/%s) - by %s\n", m.Content[0:max], i.GuildID, channelID, messageID, m.Author.Username))
 					cont++
 				}
 			}
 
-			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Longest", links).
-				SetColor(0x7289DA).MessageEmbed, i.Interaction)
+			sendEmbedInteraction(s, embed.MessageEmbed, i.Interaction)
 		},
 	}
 )

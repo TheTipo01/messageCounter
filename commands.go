@@ -601,17 +601,18 @@ var (
 
 		"longest": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			var (
-				rows                 *sql.Rows
-				links                string
-				messageID, channelID string
-				cont                 int = 1
-				err                  error
+				rows  *sql.Rows
+				links string
+				data  []byte
+				m     discordgo.Message
+				cont  = 1
+				err   error
 			)
 
 			if len(i.ApplicationCommandData().Options) > 0 {
-				rows, err = db.Query("SELECT messageID, channelID FROM messages WHERE channelID=? AND deleted=0 ORDER BY length(JSON_VALUE(message, '$.content')) DESC LIMIT 10", i.ApplicationCommandData().Options[0].ChannelValue(nil).ID)
+				rows, err = db.Query("SELECT message FROM messages WHERE channelID=? AND deleted=0 ORDER BY length(JSON_VALUE(message, '$.content')) DESC LIMIT 10", i.ApplicationCommandData().Options[0].ChannelValue(nil).ID)
 			} else {
-				rows, err = db.Query("SELECT messageID, channelID FROM messages WHERE guildID=? AND deleted=0 ORDER BY length(JSON_VALUE(message, '$.content')) DESC LIMIT 10", i.GuildID)
+				rows, err = db.Query("SELECT message FROM messages WHERE guildID=? AND deleted=0 ORDER BY length(JSON_VALUE(message, '$.content')) DESC LIMIT 10", i.GuildID)
 			}
 
 			if err != nil {
@@ -620,9 +621,10 @@ var (
 			}
 
 			for rows.Next() {
-				err = rows.Scan(&messageID, &channelID)
+				err = rows.Scan(&data)
 				if err == nil {
-					links += strconv.Itoa(cont) + ") https://discord.com/channels/" + i.GuildID + "/" + channelID + "/" + messageID + "\n"
+					_ = json.Unmarshal(data, &m)
+					links += fmt.Sprintf("%d) [%s](https://discord.com/channels/%s/%s/%s) - sent by %s\n", cont, m.Content[0:50], m.GuildID, m.ChannelID, m.ID, m.Author.Username)
 					cont++
 				}
 			}

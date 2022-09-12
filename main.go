@@ -149,7 +149,7 @@ func guildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
 	var (
 		err      error
 		messages []*discordgo.Message
-		beforeID string
+		afterID  string
 		offset   int
 	)
 
@@ -165,8 +165,8 @@ func guildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
 	for _, c := range g.Channels {
 		if c.Type != discordgo.ChannelTypeGuildVoice && c.Type != discordgo.ChannelTypeGuildCategory {
 			for {
-				_ = db.QueryRow("SELECT messageID FROM messages WHERE guildID=? AND channelID=? ORDER BY messageID LIMIT 1", c.GuildID, c.ID).Scan(&beforeID)
-				messages, err = s.ChannelMessages(c.ID, 100, beforeID, "", "")
+				_ = db.QueryRow("SELECT messageID FROM messages WHERE guildID=? AND channelID=? ORDER BY JSON_VALUE(message, '$.timestamp') DESC LIMIT 1", c.GuildID, c.ID).Scan(&afterID)
+				messages, err = s.ChannelMessages(c.ID, 100, "", afterID, "")
 				if err != nil {
 					lit.Error("error while getting messages, %s", err)
 					break
@@ -183,7 +183,7 @@ func guildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
 				}
 			}
 
-			beforeID = ""
+			afterID = ""
 		}
 	}
 

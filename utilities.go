@@ -19,7 +19,7 @@ func sendEmbedInteraction(s *discordgo.Session, embed *discordgo.MessageEmbed, i
 
 func sendEmbedInteractionFollowup(s *discordgo.Session, embed *discordgo.MessageEmbed, i *discordgo.Interaction) {
 	sliceEmbed := []*discordgo.MessageEmbed{embed}
-	_, err := s.FollowupMessageCreate(s.State.User.ID, i, false, &discordgo.WebhookParams{Embeds: sliceEmbed})
+	_, err := s.FollowupMessageCreate(i, false, &discordgo.WebhookParams{Embeds: sliceEmbed})
 	if err != nil {
 		lit.Error("FollowupMessageCreate failed: %s", err)
 	}

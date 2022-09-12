@@ -1,6 +1,5 @@
 # messageCounter
 [![Go Report Card](https://goreportcard.com/badge/github.com/TheTipo01/messageCounter)](https://goreportcard.com/report/github.com/TheTipo01/messageCounter)
-[![Build Status](https://travis-ci.com/TheTipo01/messageCounter.svg?branch=master)](https://travis-ci.com/TheTipo01/messageCounter)
 
 messageCounter - a discord bot to track messages and ghostpings
 

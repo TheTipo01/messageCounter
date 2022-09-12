@@ -547,7 +547,7 @@ var (
 
 			toSend = "Last " + strconv.Itoa(int(number)) + " deleted messages:\n```"
 
-			rows, err := db.Query("SELECT message FROM messages WHERE deleted = 1 AND channelID=? ORDER BY messageID DESC LIMIT ?", i.ChannelID, number)
+			rows, err := db.Query("SELECT message FROM messages WHERE deleted = 1 AND channelID=? ORDER BY JSON_VALUE(message, '$.timestamp') DESC LIMIT ?", i.ChannelID, number)
 			if err != nil {
 				lit.Error("Can't query database, %s", err)
 				return

@@ -197,6 +197,8 @@ func insertAuthor(message *discordgo.Message) {
 
 // Every Monday at midnight sends a random message for configured guilds
 func loadScheduler(s *discordgo.Session) {
+	var guildID, channelID, channelToID string
+
 	// Create cron scheduler
 	cron := gocron.NewScheduler(time.Local)
 
@@ -207,52 +209,51 @@ func loadScheduler(s *discordgo.Session) {
 	}
 
 	for config.Next() {
-		var guildID, channelID, channelToID string
 		err = config.Scan(&guildID, &channelID, &channelToID)
 		if err != nil {
 			lit.Error("Can't scan config, %s", err)
-			return
+			continue
 		}
 
 		// Send random message from a channel every monday at midnight
-		_, _ = cron.Every(1).Monday().At("00:00:00").Do(func() {
-			var (
-				messageJSON []byte
-				message     discordgo.Message
-				err         error
-			)
-
-			err = db.QueryRow("SELECT message FROM messages WHERE guildID=? AND channelID=? AND deleted = 0 ORDER BY RAND() LIMIT 1", guildID, channelID).Scan(&messageJSON)
-			if err != nil {
-				lit.Error("Can't get random message, %s", err)
-				return
-			}
-
-			err = json.Unmarshal(messageJSON, &message)
-			if err != nil {
-				lit.Error("Can't unmarshall message, %s", err)
-				return
-			}
-
-			// If there's an attachments, add it
-			if len(message.Attachments) > 0 {
-				message.Content = message.Attachments[0].URL + "\n" + message.Content
-			}
-
-			_, err = s.ChannelMessageSend(channelToID, "Quote of the week:```\n"+message.Content+"```Submitted by "+message.Author.Username)
-			if err != nil {
-				lit.Error("Can't send message, %s", err)
-				return
-			}
-		})
+		_, _ = cron.Every(1).Monday().At("00:00:00").Do(sendQuoteToServer, s, guildID, channelID, channelToID)
 
 		lit.Debug("Added cronjob for server %s", guildID)
 	}
 
-	_, _ = cron.Every(5).Minute().Do(func() {
-		saveAllModels()
-	})
+	_, _ = cron.Every(5).Minute().Do(saveAllModels)
 
 	// And start the scheduler
 	cron.StartAsync()
+}
+
+func sendQuoteToServer(s *discordgo.Session, guildID, channelID, channelToID string) {
+	var (
+		messageJSON []byte
+		message     discordgo.Message
+		err         error
+	)
+
+	err = db.QueryRow("SELECT message FROM messages WHERE guildID=? AND channelID=? AND deleted = 0 ORDER BY RAND() LIMIT 1", guildID, channelID).Scan(&messageJSON)
+	if err != nil {
+		lit.Error("Can't get random message, %s", err)
+		return
+	}
+
+	err = json.Unmarshal(messageJSON, &message)
+	if err != nil {
+		lit.Error("Can't unmarshall message, %s", err)
+		return
+	}
+
+	// If there's an attachments, add it
+	if len(message.Attachments) > 0 {
+		message.Content = message.Attachments[0].URL + "\n" + message.Content
+	}
+
+	_, err = s.ChannelMessageSend(channelToID, "Quote of the week:```\n"+message.Content+"```Submitted by "+message.Author.Username)
+	if err != nil {
+		lit.Error("Can't send message, %s", err)
+		return
+	}
 }

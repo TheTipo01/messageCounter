@@ -185,6 +185,12 @@ var (
 			Description: "Adds a member to a group",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "group",
+					Description: "The selected group",
+					Required:    true,
+				},
+				{
 					Type:        discordgo.ApplicationCommandOptionUser,
 					Name:        "member",
 					Description: "The member to add",
@@ -196,6 +202,12 @@ var (
 			Name:        "removemember",
 			Description: "Removes a member to a group",
 			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "group",
+					Description: "The selected group",
+					Required:    true,
+				},
 				{
 					Type:        discordgo.ApplicationCommandOptionUser,
 					Name:        "member",
@@ -776,11 +788,14 @@ var (
 			}
 
 			if createdBy == i.Member.User.ID {
+				user := i.ApplicationCommandData().Options[1].UserValue(s)
 				// Gets the old members, and adds the new one
-				userIDs += "," + i.ApplicationCommandData().Options[0].UserValue(nil).ID
+				userIDs += "," + user.ID
 
 				_, _ = db.Exec("UPDATE pollsGroup SET userIDs=? WHERE serverID=? AND name=?", userIDs, i.GuildID, i.ApplicationCommandData().Options[0].StringValue())
 
+				// Adds the nickname to the database
+				_, _ = db.Exec("INSERT IGNORE INTO users (id, nickname) VALUES (?, ?)", user.ID, user.Username)
 			} else {
 				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
 					SetColor(0x7289DA).MessageEmbed, i.Interaction)
@@ -799,7 +814,7 @@ var (
 
 			if createdBy == i.Member.User.ID {
 				// Gets the old members, and adds the new one
-				userIDs = strings.Replace(userIDs, ","+i.ApplicationCommandData().Options[0].UserValue(nil).ID, "", -1)
+				userIDs = strings.Replace(userIDs, ","+i.ApplicationCommandData().Options[1].UserValue(nil).ID, "", -1)
 
 				_, _ = db.Exec("UPDATE pollsGroup SET userIDs=? WHERE serverID=? AND name=?", userIDs, i.GuildID, i.ApplicationCommandData().Options[0].StringValue())
 

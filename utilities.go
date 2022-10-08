@@ -6,6 +6,7 @@ import (
 	"github.com/bwmarrin/lit"
 	"github.com/goccy/go-json"
 	"sort"
+	"time"
 )
 
 // Sends embed as response to an interaction
@@ -14,6 +15,19 @@ func sendEmbedInteraction(s *discordgo.Session, embed *discordgo.MessageEmbed, i
 	err := s.InteractionRespond(i, &discordgo.InteractionResponse{Type: discordgo.InteractionResponseChannelMessageWithSource, Data: &discordgo.InteractionResponseData{Embeds: sliceEmbed}})
 	if err != nil {
 		lit.Error("InteractionRespond failed: %s", err)
+	}
+}
+
+// Sends and delete after three second an embed in a given channel
+func sendAndDeleteEmbedInteraction(s *discordgo.Session, embed *discordgo.MessageEmbed, i *discordgo.Interaction, wait time.Duration) {
+	sendEmbedInteraction(s, embed, i)
+
+	time.Sleep(wait)
+
+	err := s.InteractionResponseDelete(i)
+	if err != nil {
+		lit.Error("InteractionResponseDelete failed: %s", err)
+		return
 	}
 }
 

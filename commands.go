@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -726,8 +727,8 @@ var (
 			// If the group doesn't exist, just quit
 			_ = db.QueryRow("SELECT COUNT(*) FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, group).Scan(&n)
 			if n == 0 {
-				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
 				return
 			}
 
@@ -741,8 +742,8 @@ var (
 			server[i.GuildID].polls[msg.ID] = true
 
 			// Add the reactions
-			_ = s.MessageReactionAdd(i.GuildID, msg.ID, "👍")
-			_ = s.MessageReactionAdd(i.GuildID, msg.ID, "👎")
+			_ = s.MessageReactionAdd(msg.ChannelID, msg.ID, "👍")
+			_ = s.MessageReactionAdd(msg.ChannelID, msg.ID, "👎")
 		},
 
 		"creategroup": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -750,11 +751,11 @@ var (
 			_ = db.QueryRow("SELECT COUNT(*) FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue()).Scan(&n)
 			if n == 0 {
 				_, _ = db.Exec("INSERT INTO pollsGroup (serverID, name, createdBy) VALUES (?, ?, ?)", i.GuildID, i.ApplicationCommandData().Options[0].StringValue(), i.Member.User.ID)
-				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group created!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group created!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
 			} else {
-				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group already exists!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group already exists!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
 			}
 		},
 
@@ -763,17 +764,17 @@ var (
 			_ = db.QueryRow("SELECT createdBy FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue()).Scan(&userID)
 
 			if userID == "" {
-				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
 			}
 
 			if userID == i.Member.User.ID {
 				_, _ = db.Exec("DELETE FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue())
-				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group deleted!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group deleted!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
 			} else {
-				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
 			}
 		},
 
@@ -783,22 +784,28 @@ var (
 			_ = db.QueryRow("SELECT createdBy, userIDs FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue()).Scan(&createdBy, &userIDs)
 
 			if createdBy == "" {
-				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
 			}
 
 			if createdBy == i.Member.User.ID {
 				user := i.ApplicationCommandData().Options[1].UserValue(s)
 				// Gets the old members, and adds the new one
-				userIDs += "," + user.ID
+				if userIDs == "" {
+					userIDs = user.ID
+				} else {
+					userIDs += "," + user.ID
+				}
 
 				_, _ = db.Exec("UPDATE pollsGroup SET userIDs=? WHERE serverID=? AND name=?", userIDs, i.GuildID, i.ApplicationCommandData().Options[0].StringValue())
 
 				// Adds the nickname to the database
 				_, _ = db.Exec("INSERT IGNORE INTO users (id, nickname) VALUES (?, ?)", user.ID, user.Username)
+
+				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Member added!").MessageEmbed, i.Interaction, time.Second*3)
 			} else {
-				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
 			}
 		},
 
@@ -808,8 +815,8 @@ var (
 			_ = db.QueryRow("SELECT createdBy, userIDs FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue()).Scan(&createdBy, &userIDs)
 
 			if createdBy == "" {
-				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
 			}
 
 			if createdBy == i.Member.User.ID {
@@ -819,8 +826,8 @@ var (
 				_, _ = db.Exec("UPDATE pollsGroup SET userIDs=? WHERE serverID=? AND name=?", userIDs, i.GuildID, i.ApplicationCommandData().Options[0].StringValue())
 
 			} else {
-				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
 			}
 		},
 	}

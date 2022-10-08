@@ -61,7 +61,7 @@ func init() {
 	}
 
 	// Initialize tables
-	execQuery(tblMessages, tblUsers, tblServers, tblChannels, tblPings, tblConfig)
+	execQuery(tblMessages, tblUsers, tblServers, tblChannels, tblPings, tblConfig, tblPollState, tblPollsGroups)
 
 	// And add the everyone user to the table, as we use that for logging @everyone and @here
 	_, err = db.Exec("INSERT IGNORE INTO users (id, nickname) VALUES(?, ?)", "everyone", "everyone")

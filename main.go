@@ -283,7 +283,7 @@ func reactionUpdate(s *discordgo.Session, r *discordgo.MessageReaction, removed 
 					var userAnsweredPositiveUpdated, userAnsweredUpdated []string
 
 					// Returns if the user already answered
-					if strings.Contains(userAnswered, r.UserID) {
+					if strings.Contains(userAnswered, r.UserID) && !removed {
 						break
 					}
 
@@ -307,7 +307,7 @@ func reactionUpdate(s *discordgo.Session, r *discordgo.MessageReaction, removed 
 					} else {
 						userAnsweredPositiveUpdated = strings.Split(userAnsweredPositive, ",")
 					}
-					
+
 					cleanSlice(&userAnsweredPositiveUpdated)
 
 					embed := NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", question).

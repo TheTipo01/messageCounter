@@ -75,8 +75,8 @@ func saveAllModels() {
 // loadModel loads the model from the db
 func loadModel() {
 	var (
-		data    []byte
-		guildID string
+		data               []byte
+		guildID, messageID string
 	)
 
 	rows, _ := db.Query("SELECT model, id FROM servers")
@@ -90,6 +90,16 @@ func loadModel() {
 			server[guildID].model = buildModel(guildID)
 		} else {
 			_ = json.Unmarshal(data, &server[guildID].model)
+		}
+
+		server[guildID].polls = make(map[string]bool)
+
+		// Also load every poll
+		polls, _ := db.Query("SELECT messageID FROM pollState WHERE guildID = ?", guildID)
+		for polls.Next() {
+			_ = polls.Scan(&messageID)
+
+			server[guildID].polls[messageID] = true
 		}
 	}
 }

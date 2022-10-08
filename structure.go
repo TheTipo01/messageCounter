@@ -6,6 +6,7 @@ import "github.com/mb-14/gomarkov"
 type Server struct {
 	numberOfMessages int
 	model            *gomarkov.Chain
+	polls            map[string]bool
 }
 
 type kv struct {

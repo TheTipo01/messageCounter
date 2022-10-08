@@ -9,6 +9,7 @@ import (
 	"github.com/mb-14/gomarkov"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -83,6 +84,8 @@ func main() {
 	dg.AddHandler(messageUpdate)
 	dg.AddHandler(guildCreate)
 	dg.AddHandler(ready)
+	dg.AddHandler(reactionAdd)
+	dg.AddHandler(reactionRemove)
 
 	// Add commands handler
 	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -95,7 +98,7 @@ func main() {
 	})
 
 	// Initialize intents that we use
-	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuildMessages | discordgo.IntentsGuilds)
+	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuildMessages | discordgo.IntentsGuilds | discordgo.IntentsGuildMessageReactions)
 
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
@@ -240,6 +243,85 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 				_, err = s.ApplicationCommandCreate(s.State.User.ID, "", l)
 				if err != nil {
 					lit.Error("Cannot create '%s' command: %s", l.Name, err)
+				}
+			}
+		}
+	}
+}
+
+func reactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
+	if r.UserID == s.State.User.ID {
+		return
+	}
+
+	reactionUpdate(s, r.MessageReaction, false)
+}
+
+func reactionRemove(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
+	if r.UserID == s.State.User.ID {
+		return
+	}
+
+	reactionUpdate(s, r.MessageReaction, true)
+}
+
+func reactionUpdate(s *discordgo.Session, r *discordgo.MessageReaction, removed bool) {
+	// Checks if the message is a poll
+	if _, ok := server[r.GuildID].polls[r.MessageID]; ok && (r.Emoji.Name == "👍" || r.Emoji.Name == "👎") {
+		var tmp, question, userAnswered, userAnsweredPositive string
+		// Checks if the user is in the group for that poll
+		_ = db.QueryRow("SELECT userIDs, question, userAnswered, userAnsweredPositive FROM pollState, pollsGroup WHERE messageID = ? AND serverID = ? AND pollsGroup.name = pollState.groupName", r.MessageID, r.GuildID).Scan(&tmp, &question, &userAnswered, &userAnsweredPositive)
+
+		if tmp != "" {
+			// Group found
+			userIDs := strings.Split(tmp, ",")
+
+			// Checks if the user is in the group
+			for _, id := range userIDs {
+				if id == r.UserID {
+					// User found, we modify the message
+					var userAnsweredPositiveUpdated, userAnsweredUpdated []string
+
+					// Returns if the user already answered
+					if strings.Contains(userAnswered, r.UserID) && !removed {
+						break
+					}
+
+					// Removed or adds the user accordingly
+					if removed {
+						userAnsweredUpdated = removeString(strings.Split(userAnswered, ","), r.UserID)
+					} else {
+						userAnsweredUpdated = append(strings.Split(userAnswered, ","), r.UserID)
+					}
+
+					cleanSlice(&userAnsweredUpdated)
+					answerNumber := len(userAnsweredUpdated)
+
+					if r.Emoji.Name == "👍" {
+						// Add or remove the user from the positive answer
+						if removed {
+							userAnsweredPositiveUpdated = removeString(strings.Split(userAnsweredPositive, ","), r.UserID)
+						} else {
+							userAnsweredPositiveUpdated = append(strings.Split(userAnsweredPositive, ","), r.UserID)
+						}
+					} else {
+						userAnsweredPositiveUpdated = strings.Split(userAnsweredPositive, ",")
+					}
+
+					cleanSlice(&userAnsweredPositiveUpdated)
+
+					embed := NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", question).
+						AddField("Answered", "Number of people who answered: "+strconv.Itoa(answerNumber)).
+						AddField("Remaining", "People who still need to answer: "+formatUsers(userIDs, userAnsweredUpdated)).
+						AddField("Percentage", "Percentage of people who answered positively: "+strconv.Itoa(int((float64(len(userAnsweredPositiveUpdated))/float64(answerNumber))*100))+"%").
+						SetColor(0x00ff00).MessageEmbed
+
+					// We update the message embed
+					_, _ = s.ChannelMessageEditEmbed(r.ChannelID, r.MessageID, embed)
+
+					// And the database
+					_, _ = db.Exec("UPDATE pollState SET userAnswered = ?, userAnsweredPositive = ? WHERE messageID = ?", strings.Join(userAnsweredUpdated, ","), strings.Join(userAnsweredPositiveUpdated, ","), r.MessageID)
+					break
 				}
 			}
 		}

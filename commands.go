@@ -138,6 +138,72 @@ var (
 				},
 			},
 		},
+		{
+			Name:        "poll",
+			Description: "Creates a poll",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "question",
+					Description: "The question to ask",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "group",
+					Description: "A group of people to poll",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "creategroup",
+			Description: "Creates a group of people to poll",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "name",
+					Description: "The name of the group",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "deletegroup",
+			Description: "Deletes a group of people to poll",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "name",
+					Description: "The name of the group",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "addmember",
+			Description: "Adds a member to a group",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionUser,
+					Name:        "member",
+					Description: "The member to add",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "removemember",
+			Description: "Removes a member to a group",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionUser,
+					Name:        "member",
+					Description: "The member to remove",
+					Required:    true,
+				},
+			},
+		},
 	}
 
 	// Handler
@@ -639,6 +705,108 @@ var (
 			}
 
 			sendEmbedInteraction(s, embed.MessageEmbed, i.Interaction)
+		},
+		"poll": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			var n int
+			question := i.ApplicationCommandData().Options[0].StringValue()
+			group := i.ApplicationCommandData().Options[1].StringValue()
+
+			// If the group doesn't exist, just quit
+			_ = db.QueryRow("SELECT COUNT(*) FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, group).Scan(&n)
+			if n == 0 {
+				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				return
+			}
+
+			// Create the poll message
+			msg, _ := s.ChannelMessageSendEmbed(i.ChannelID, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", question).MessageEmbed)
+
+			// Adds the message to the db
+			_, _ = db.Exec("INSERT INTO pollState (messageID, question, groupName, guildID) VALUES (?, ?, ?, ?)", msg.ID, question, group, i.GuildID)
+
+			// And the map
+			server[i.GuildID].polls[msg.ID] = true
+
+			// Add the reactions
+			_ = s.MessageReactionAdd(i.GuildID, msg.ID, "👍")
+			_ = s.MessageReactionAdd(i.GuildID, msg.ID, "👎")
+		},
+
+		"creategroup": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			var n int
+			_ = db.QueryRow("SELECT COUNT(*) FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue()).Scan(&n)
+			if n == 0 {
+				_, _ = db.Exec("INSERT INTO pollsGroup (serverID, name, createdBy) VALUES (?, ?, ?)", i.GuildID, i.ApplicationCommandData().Options[0].StringValue(), i.Member.User.ID)
+				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group created!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+			} else {
+				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group already exists!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+			}
+		},
+
+		"deletegroup": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			var userID string
+			_ = db.QueryRow("SELECT createdBy FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue()).Scan(&userID)
+
+			if userID == "" {
+				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+			}
+
+			if userID == i.Member.User.ID {
+				_, _ = db.Exec("DELETE FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue())
+				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group deleted!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+			} else {
+				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+			}
+		},
+
+		// Adds a member to a group. Only the creator of the group can add people
+		"addmember": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			var createdBy, userIDs string
+			_ = db.QueryRow("SELECT createdBy, userIDs FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue()).Scan(&createdBy, &userIDs)
+
+			if createdBy == "" {
+				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+			}
+
+			if createdBy == i.Member.User.ID {
+				// Gets the old members, and adds the new one
+				userIDs += "," + i.ApplicationCommandData().Options[0].UserValue(nil).ID
+
+				_, _ = db.Exec("UPDATE pollsGroup SET userIDs=? WHERE serverID=? AND name=?", userIDs, i.GuildID, i.ApplicationCommandData().Options[0].StringValue())
+
+			} else {
+				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+			}
+		},
+
+		// Removes a member from a group. Only the creator of the group can remove people
+		"removemember": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			var createdBy, userIDs string
+			_ = db.QueryRow("SELECT createdBy, userIDs FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue()).Scan(&createdBy, &userIDs)
+
+			if createdBy == "" {
+				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+			}
+
+			if createdBy == i.Member.User.ID {
+				// Gets the old members, and adds the new one
+				userIDs = strings.Replace(userIDs, ","+i.ApplicationCommandData().Options[0].UserValue(nil).ID, "", -1)
+
+				_, _ = db.Exec("UPDATE pollsGroup SET userIDs=? WHERE serverID=? AND name=?", userIDs, i.GuildID, i.ApplicationCommandData().Options[0].StringValue())
+
+			} else {
+				sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
+					SetColor(0x7289DA).MessageEmbed, i.Interaction)
+			}
 		},
 	}
 )

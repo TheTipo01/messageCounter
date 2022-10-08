@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
 	_ "github.com/go-sql-driver/mysql"
@@ -83,6 +84,8 @@ func main() {
 	dg.AddHandler(messageUpdate)
 	dg.AddHandler(guildCreate)
 	dg.AddHandler(ready)
+	dg.AddHandler(reactionAdd)
+	dg.AddHandler(reactionRemove)
 
 	// Add commands handler
 	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -240,6 +243,61 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 				_, err = s.ApplicationCommandCreate(s.State.User.ID, "", l)
 				if err != nil {
 					lit.Error("Cannot create '%s' command: %s", l.Name, err)
+				}
+			}
+		}
+	}
+}
+
+func reactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
+	if r.UserID == s.State.User.ID {
+		return
+	}
+
+	reactionUpdate(s, r.MessageReaction, false)
+}
+
+func reactionRemove(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
+	if r.UserID == s.State.User.ID {
+		return
+	}
+
+	reactionUpdate(s, r.MessageReaction, true)
+}
+
+func reactionUpdate(s *discordgo.Session, r *discordgo.MessageReaction, removed bool) {
+	// Checks if the message is a poll
+	if _, ok := server[r.GuildID].polls[r.MessageID]; ok && (r.Emoji.Name == "👍" || r.Emoji.Name == "👎") {
+		var tmp, question, userAnswered string
+		// Checks if the user is in the group for that poll
+		_ = db.QueryRow("SELECT userIDs, question, userAnswered FROM pollState, pollsGroup WHERE messageID = ? AND serverID = ? AND pollsGroup.name = pollState.groupName", r.MessageID, r.GuildID).Scan(&tmp, &question, &userAnswered)
+
+		if tmp != "" {
+			// Group found
+			userIDs := strings.Split(tmp, ",")
+
+			// Checks if the user is in the group
+			for _, id := range userIDs {
+				if id == r.UserID {
+					// User found, we modify the message
+
+					// Removed or adds the user accordingly
+					var userAnsweredUpdated []string
+					if removed {
+						userAnsweredUpdated = removeString(strings.Split(userAnswered, ","), r.UserID)
+					} else {
+						userAnsweredUpdated = append(strings.Split(userAnswered, ","), r.UserID)
+					}
+
+					answerNumber := len(userAnsweredUpdated)
+					message := fmt.Sprintf("%s\nNumber of people who answered: %d\nPeople who still need to answer: %s\n", question, answerNumber, formatUsers(userIDs, userAnsweredUpdated))
+					message += fmt.Sprintf("\nPercentage of people who answered yes: %.2f%%", float64(answerNumber)/float64(len(userIDs))*100)
+					// We update the message
+					_, _ = s.ChannelMessageEdit(r.ChannelID, r.MessageID, message)
+
+					// And the database
+					_, _ = db.Exec("UPDATE pollState SET userAnswered = ? WHERE messageID = ?", strings.Join(userAnsweredUpdated, ","), r.MessageID)
+					break
 				}
 			}
 		}

@@ -257,3 +257,16 @@ func sendQuoteToServer(s *discordgo.Session, guildID, channelID, channelToID str
 		return
 	}
 }
+
+// Returns the nickname of a person given its ID
+func getNickname(id string) string {
+	var nickname string
+
+	err := db.QueryRow("SELECT nickname FROM users WHERE id=?", id).Scan(&nickname)
+	if err != nil {
+		lit.Error("Can't get nickname, %s", err)
+		return ""
+	}
+
+	return nickname
+}

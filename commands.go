@@ -790,6 +790,14 @@ var (
 
 			if createdBy == i.Member.User.ID {
 				user := i.ApplicationCommandData().Options[1].UserValue(s)
+
+				// If the user is already in the group, just return
+				if strings.Contains(userIDs, user.ID) {
+					sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "User already in the group!").
+						SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+					return
+				}
+
 				// Gets the old members, and adds the new one
 				if userIDs == "" {
 					userIDs = user.ID
@@ -820,6 +828,13 @@ var (
 			}
 
 			if createdBy == i.Member.User.ID {
+				// If the user is not in the group, just return
+				if !strings.Contains(userIDs, i.ApplicationCommandData().Options[1].UserValue(s).ID) {
+					sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "User not in the group!").
+						SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+					return
+				}
+
 				// Gets the old members, and adds the new one
 				userIDs = strings.Replace(userIDs, ","+i.ApplicationCommandData().Options[1].UserValue(nil).ID, "", -1)
 

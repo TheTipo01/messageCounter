@@ -282,6 +282,11 @@ func reactionUpdate(s *discordgo.Session, r *discordgo.MessageReaction, removed 
 					// User found, we modify the message
 					var userAnsweredPositiveUpdated, userAnsweredUpdated []string
 
+					// Returns if the user already answered
+					if strings.Contains(userAnswered, r.UserID) {
+						break
+					}
+
 					// Removed or adds the user accordingly
 					if removed {
 						userAnsweredUpdated = removeString(strings.Split(userAnswered, ","), r.UserID)

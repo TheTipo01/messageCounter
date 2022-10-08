@@ -299,9 +299,11 @@ func reactionUpdate(s *discordgo.Session, r *discordgo.MessageReaction, removed 
 						} else {
 							userAnsweredPositiveUpdated = append(strings.Split(userAnsweredPositive, ","), r.UserID)
 						}
-
-						cleanSlice(&userAnsweredPositiveUpdated)
+					} else {
+						userAnsweredPositiveUpdated = strings.Split(userAnsweredPositive, ",")
 					}
+					
+					cleanSlice(&userAnsweredPositiveUpdated)
 
 					embed := NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", question).
 						AddField("Answered", "Number of people who answered: "+strconv.Itoa(answerNumber)).

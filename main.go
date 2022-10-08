@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
 	_ "github.com/go-sql-driver/mysql"
@@ -10,6 +9,7 @@ import (
 	"github.com/mb-14/gomarkov"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -98,7 +98,7 @@ func main() {
 	})
 
 	// Initialize intents that we use
-	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuildMessages | discordgo.IntentsGuilds)
+	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuildMessages | discordgo.IntentsGuilds | discordgo.IntentsGuildMessageReactions)
 
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
@@ -268,9 +268,9 @@ func reactionRemove(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
 func reactionUpdate(s *discordgo.Session, r *discordgo.MessageReaction, removed bool) {
 	// Checks if the message is a poll
 	if _, ok := server[r.GuildID].polls[r.MessageID]; ok && (r.Emoji.Name == "👍" || r.Emoji.Name == "👎") {
-		var tmp, question, userAnswered string
+		var tmp, question, userAnswered, userAnsweredPositive string
 		// Checks if the user is in the group for that poll
-		_ = db.QueryRow("SELECT userIDs, question, userAnswered FROM pollState, pollsGroup WHERE messageID = ? AND serverID = ? AND pollsGroup.name = pollState.groupName", r.MessageID, r.GuildID).Scan(&tmp, &question, &userAnswered)
+		_ = db.QueryRow("SELECT userIDs, question, userAnswered, userAnsweredPositive FROM pollState, pollsGroup WHERE messageID = ? AND serverID = ? AND pollsGroup.name = pollState.groupName", r.MessageID, r.GuildID).Scan(&tmp, &question, &userAnswered, &userAnsweredPositive)
 
 		if tmp != "" {
 			// Group found
@@ -280,23 +280,40 @@ func reactionUpdate(s *discordgo.Session, r *discordgo.MessageReaction, removed 
 			for _, id := range userIDs {
 				if id == r.UserID {
 					// User found, we modify the message
+					var userAnsweredPositiveUpdated, userAnsweredUpdated []string
 
 					// Removed or adds the user accordingly
-					var userAnsweredUpdated []string
 					if removed {
 						userAnsweredUpdated = removeString(strings.Split(userAnswered, ","), r.UserID)
 					} else {
 						userAnsweredUpdated = append(strings.Split(userAnswered, ","), r.UserID)
 					}
 
+					cleanSlice(&userAnsweredUpdated)
 					answerNumber := len(userAnsweredUpdated)
-					message := fmt.Sprintf("%s\nNumber of people who answered: %d\nPeople who still need to answer: %s\n", question, answerNumber, formatUsers(userIDs, userAnsweredUpdated))
-					message += fmt.Sprintf("\nPercentage of people who answered yes: %.2f%%", float64(answerNumber)/float64(len(userIDs))*100)
-					// We update the message
-					_, _ = s.ChannelMessageEdit(r.ChannelID, r.MessageID, message)
+
+					if r.Emoji.Name == "👍" {
+						// Add or remove the user from the positive answer
+						if removed {
+							userAnsweredPositiveUpdated = removeString(strings.Split(userAnsweredPositive, ","), r.UserID)
+						} else {
+							userAnsweredPositiveUpdated = append(strings.Split(userAnsweredPositive, ","), r.UserID)
+						}
+
+						cleanSlice(&userAnsweredPositiveUpdated)
+					}
+
+					embed := NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", question).
+						AddField("Answered", "Number of people who answered: "+strconv.Itoa(answerNumber)).
+						AddField("Remaining", "People who still need to answer: "+formatUsers(userIDs, userAnsweredUpdated)).
+						AddField("Percentage", "Percentage of people who answered positively: "+strconv.Itoa(int((float64(len(userAnsweredPositiveUpdated))/float64(answerNumber))*100))+"%").
+						SetColor(0x00ff00).MessageEmbed
+
+					// We update the message embed
+					_, _ = s.ChannelMessageEditEmbed(r.ChannelID, r.MessageID, embed)
 
 					// And the database
-					_, _ = db.Exec("UPDATE pollState SET userAnswered = ? WHERE messageID = ?", strings.Join(userAnsweredUpdated, ","), r.MessageID)
+					_, _ = db.Exec("UPDATE pollState SET userAnswered = ?, userAnsweredPositive = ? WHERE messageID = ?", strings.Join(userAnsweredUpdated, ","), strings.Join(userAnsweredPositiveUpdated, ","), r.MessageID)
 					break
 				}
 			}

@@ -34,3 +34,16 @@ func removeString(slice []string, str string) []string {
 
 	return slice
 }
+
+// Deletes every empty string in a slice
+func cleanSlice(i *[]string) {
+	var tmp []string
+
+	for _, s := range *i {
+		if s != "" {
+			tmp = append(tmp, s)
+		}
+	}
+
+	*i = tmp
+}

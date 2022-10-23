@@ -1,4 +1,4 @@
-module messageCounter
+module github.com/TheTipo01/messageCounter
 
 go 1.16
 

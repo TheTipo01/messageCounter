@@ -15,7 +15,7 @@ const (
 	tblServers     = "CREATE TABLE IF NOT EXISTS `servers` ( `id` varchar(20) NOT NULL, `name` varchar(100) NOT NULL, `model` longtext NOT NULL, PRIMARY KEY (`id`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
 	tblChannels    = "CREATE TABLE IF NOT EXISTS `channels` ( `id` varchar(20) NOT NULL, `name` text NOT NULL DEFAULT '', `serverId` varchar(20) NOT NULL, PRIMARY KEY (`id`), KEY `FK_channels_server` (`serverId`), CONSTRAINT `FK_channels_server` FOREIGN KEY (`serverId`) REFERENCES `servers` (`id`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
 	tblPings       = "CREATE TABLE IF NOT EXISTS `pings` ( `id` int(11) NOT NULL AUTO_INCREMENT, `menzionatoreId` varchar(20) NOT NULL, `menzionatoId` varchar(20) NOT NULL, `channelId` varchar(20) NOT NULL, `serverId` varchar(20) NOT NULL, `timestamp` datetime NOT NULL, `messageId` varchar(20) NOT NULL, PRIMARY KEY (`id`), KEY `FK_pings_channels` (`channelId`), KEY `FK_pings_server` (`serverId`), KEY `FK_pings_users` (`menzionatoreId`), KEY `FK_pings_users_2` (`menzionatoId`), KEY `messageId` (`messageId`), CONSTRAINT `FK_pings_channels` FOREIGN KEY (`channelId`) REFERENCES `channels` (`id`), CONSTRAINT `FK_pings_messages` FOREIGN KEY (`messageId`) REFERENCES `messages` (`messageID`), CONSTRAINT `FK_pings_server` FOREIGN KEY (`serverId`) REFERENCES `servers` (`id`), CONSTRAINT `FK_pings_users` FOREIGN KEY (`menzionatoreId`) REFERENCES `users` (`id`), CONSTRAINT `FK_pings_users_2` FOREIGN KEY (`menzionatoId`) REFERENCES `users` (`id`) ) ENGINE=InnoDB AUTO_INCREMENT=88 DEFAULT CHARSET=utf8mb4;"
-	tblConfig      = "CREATE TABLE IF NOT EXISTS `config` ( `id` int(11) NOT NULL AUTO_INCREMENT, `guildID` varchar(20) CHARACTER SET utf8mb4 NOT NULL DEFAULT '0', `channelID` varchar(20) CHARACTER SET utf8mb4 NOT NULL DEFAULT '0', `channelToID` varchar(20) CHARACTER SET utf8mb4 NOT NULL DEFAULT '0', `offset` int(11) DEFAULT 0, PRIMARY KEY (`id`), KEY `FK_config_server` (`guildID`), KEY `FK_config_channels` (`channelID`), KEY `FK_config_channels_2` (`channelToID`), CONSTRAINT `FK_config_channels` FOREIGN KEY (`channelID`) REFERENCES `channels` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT `FK_config_channels_2` FOREIGN KEY (`channelToID`) REFERENCES `channels` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT `FK_config_server` FOREIGN KEY (`guildID`) REFERENCES `servers` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;"
+	tblConfig      = "CREATE TABLE IF NOT EXISTS `config` ( `id` int(11) NOT NULL AUTO_INCREMENT, `guildID` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '0', `channelID` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '0', `channelToID` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '0', `offset` int(11) DEFAULT 0, `hiddenChannel` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL, PRIMARY KEY (`id`), KEY `FK_config_server` (`guildID`), KEY `FK_config_channels` (`channelID`), KEY `FK_config_channels_2` (`channelToID`), KEY `FK_config_channels_3` (`hiddenChannel`), CONSTRAINT `FK_config_channels` FOREIGN KEY (`channelID`) REFERENCES `channels` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT `FK_config_channels_2` FOREIGN KEY (`channelToID`) REFERENCES `channels` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT `FK_config_channels_3` FOREIGN KEY (`hiddenChannel`) REFERENCES `channels` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT `FK_config_server` FOREIGN KEY (`guildID`) REFERENCES `servers` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;"
 	tblPollState   = "CREATE TABLE IF NOT EXISTS `pollState` ( `messageID` varchar(20) NOT NULL, `userAnswered` text NOT NULL DEFAULT '', `question` text NOT NULL, `groupName` varchar(255) NOT NULL, `guildID` varchar(20) NOT NULL, `userAnsweredPositive` text NOT NULL DEFAULT '', PRIMARY KEY (`messageID`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
 	tblPollsGroups = "CREATE TABLE IF NOT EXISTS `pollsGroup` ( `serverID` varchar(20) NOT NULL, `name` varchar(255) NOT NULL, `userIDs` text NOT NULL DEFAULT '', `createdBy` varchar(20) NOT NULL, PRIMARY KEY (`serverID`,`name`), CONSTRAINT `FK_groups_servers` FOREIGN KEY (`serverID`) REFERENCES `servers` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
 )
@@ -271,4 +271,20 @@ func getNickname(id string) string {
 	}
 
 	return nickname
+}
+
+func getHiddenChannels() {
+	var guildID, channelID string
+
+	rows, _ := db.Query("SELECT guildID, hiddenChannel FROM config")
+
+	for rows.Next() {
+		err := rows.Scan(&guildID, &channelID)
+		if err != nil {
+			lit.Error("Can't get hidden channels, %s", err)
+			continue
+		}
+
+		server[guildID].hiddenChannel = channelID
+	}
 }

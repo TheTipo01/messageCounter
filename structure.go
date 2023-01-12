@@ -7,6 +7,7 @@ type Server struct {
 	numberOfMessages int
 	model            *gomarkov.Chain
 	polls            map[string]bool
+	hiddenChannel    string
 }
 
 type kv struct {

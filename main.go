@@ -68,6 +68,8 @@ func init() {
 	if err != nil {
 		lit.Error("Error inserting user everyone in the database, %s", err.Error())
 	}
+
+	getHiddenChannels()
 }
 
 func main() {
@@ -135,6 +137,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		_, _ = s.ChannelMessageSend(m.ChannelID, "nice")
 	case 99999:
 		_, _ = s.ChannelMessageSend(m.ChannelID, "So guys, we did it. We finally reached 100k messages")
+	}
+
+	if server[m.GuildID].hiddenChannel == m.GuildID {
+		for _, a := range m.Attachments {
+			if (a.ContentType == "image/png" || a.ContentType == "image/jpeg") && !strings.HasPrefix(a.Filename, "SPOILER") {
+				_, _ = s.ChannelMessageSend(m.ChannelID, "Hey "+m.Author.Mention()+", are you sure you want to post this here without a spoiler tag?")
+			}
+		}
 	}
 }
 

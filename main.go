@@ -138,7 +138,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		_, _ = s.ChannelMessageSend(m.ChannelID, "So guys, we did it. We finally reached 100k messages")
 	}
 
-	if server[m.GuildID].hiddenChannel == m.GuildID {
+	if server[m.GuildID].hiddenChannel == m.ChannelID {
 		for _, a := range m.Attachments {
 			if (a.ContentType == "image/png" || a.ContentType == "image/jpeg") && !strings.HasPrefix(a.Filename, "SPOILER") {
 				_, _ = s.ChannelMessageSend(m.ChannelID, "Hey "+m.Author.Mention()+", are you sure you want to post this here without a spoiler tag?")

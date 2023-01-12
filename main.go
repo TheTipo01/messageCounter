@@ -68,8 +68,6 @@ func init() {
 	if err != nil {
 		lit.Error("Error inserting user everyone in the database, %s", err.Error())
 	}
-
-	getHiddenChannels()
 }
 
 func main() {
@@ -111,6 +109,7 @@ func main() {
 
 	loadScheduler(dg)
 	loadModel()
+	getHiddenChannels()
 
 	// Wait here until CTRL-C or other term signal is received.
 	lit.Info("messageCounter is now running. Press CTRL-C to exit.")

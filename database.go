@@ -276,7 +276,7 @@ func getNickname(id string) string {
 func getHiddenChannels() {
 	var guildID, channelID string
 
-	rows, _ := db.Query("SELECT guildID, hiddenChannel FROM config")
+	rows, _ := db.Query("SELECT guildID, hiddenChannel FROM config WHERE hiddenChannel IS NOT NULL")
 
 	for rows.Next() {
 		err := rows.Scan(&guildID, &channelID)

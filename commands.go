@@ -305,7 +305,7 @@ var (
 				words       = make(map[string]int)
 				people      = make(map[string]string)
 				// Match non-space character sequences.
-				re      = regexp.MustCompile(`[\S]+`)
+				re      = regexp.MustCompile(`\S+`)
 				channel string
 				bot     bool
 			)

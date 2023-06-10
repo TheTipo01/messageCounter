@@ -12,5 +12,8 @@ drivername: "mysql"
 #MySQL
 datasourcename: "user:pass@tcp(ip:3306)/database"
 
+#Site to show as the status of the bot
+site: "example.com"
+
 #Log level. Possible value are error, warning, informational and debug
 loglevel: informational

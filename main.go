@@ -20,6 +20,7 @@ type Config struct {
 	Driver   string `fig:"drivername" validate:"required"`
 	DSN      string `fig:"datasourcename" validate:"required"`
 	LogLevel string `fig:"loglevel" validate:"required"`
+	Site     string `fig:"site" validate:"required"`
 }
 
 var (
@@ -29,6 +30,8 @@ var (
 	db *sql.DB
 	// Server structure for all the things we need (currently only the number of messages)
 	server = make(map[string]*Server)
+	// Site URL
+	site string
 )
 
 func init() {
@@ -42,6 +45,7 @@ func init() {
 	}
 
 	token = cfg.Token
+	site = cfg.Site
 
 	// Set lit.LogLevel to the given value
 	switch strings.ToLower(cfg.LogLevel) {
@@ -215,7 +219,7 @@ func guildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
 
 func ready(s *discordgo.Session, _ *discordgo.Ready) {
 	// Set the playing status.
-	err := s.UpdateGameStatus(0, "ghostping.ga")
+	err := s.UpdateGameStatus(0, site)
 	if err != nil {
 		lit.Error("Can't set status, %s", err)
 	}

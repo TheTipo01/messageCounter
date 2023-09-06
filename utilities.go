@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
-	"github.com/goccy/go-json"
 	"sort"
 	"time"
 )
@@ -51,21 +49,4 @@ func sorting(classifica map[string]int) []kv {
 	})
 
 	return ss
-}
-
-// isCommandEqual compares two command by marshalling them to JSON. Yes, I know. I don't want to write recursive things.
-func isCommandEqual(c *discordgo.ApplicationCommand, v *discordgo.ApplicationCommand) bool {
-	c.Version = ""
-	c.ID = ""
-	c.ApplicationID = ""
-	c.Type = 0
-	cBytes, _ := json.Marshal(&c)
-
-	v.Version = ""
-	v.ID = ""
-	v.ApplicationID = ""
-	v.Type = 0
-	vBytes, _ := json.Marshal(&v)
-
-	return bytes.Compare(cBytes, vBytes) == 0
 }

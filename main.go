@@ -111,6 +111,12 @@ func main() {
 		return
 	}
 
+	// Register commands
+	_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, "", commands)
+	if err != nil {
+		lit.Error("Can't register commands, %s", err)
+	}
+
 	loadScheduler(dg)
 	loadModel()
 	getHiddenChannels()
@@ -222,43 +228,6 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 	err := s.UpdateGameStatus(0, site)
 	if err != nil {
 		lit.Error("Can't set status, %s", err)
-	}
-
-	// Checks for unused commands and deletes them
-	if cmds, err := s.ApplicationCommands(s.State.User.ID, ""); err == nil {
-		found := false
-
-		for _, l := range commands {
-			found = false
-
-			for _, o := range cmds {
-				// We compare every online command with the ones locally stored, to find if a command with the same name exists
-				if l.Name == o.Name {
-					// If the options of the command are not equal, we re-register it
-					if !isCommandEqual(l, o) {
-						lit.Info("Registering command `%s`", l.Name)
-
-						_, err = s.ApplicationCommandCreate(s.State.User.ID, "", l)
-						if err != nil {
-							lit.Error("Cannot create '%s' command: %s", l.Name, err)
-						}
-					}
-
-					found = true
-					break
-				}
-			}
-
-			// If we didn't found a match for the locally stored command, it means the command is new. We register it
-			if !found {
-				lit.Info("Registering new command `%s`", l.Name)
-
-				_, err = s.ApplicationCommandCreate(s.State.User.ID, "", l)
-				if err != nil {
-					lit.Error("Cannot create '%s' command: %s", l.Name, err)
-				}
-			}
-		}
 	}
 }
 

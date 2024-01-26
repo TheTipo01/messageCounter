@@ -220,9 +220,9 @@ var (
 	}
 
 	// Handler
-	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
+	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}){
 		// Prints the number of characters sent for a given channel, or if not specified for the entire server
-		"characters": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"characters": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
 			var (
 				mex         *sql.Rows
 				err         error
@@ -290,11 +290,11 @@ var (
 			toSend = fmt.Sprintf("Number of characters sent: %d\n\n", cont) + toSend
 
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Characters", toSend).
-				SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				SetColor(0x7289DA).MessageEmbed, i.Interaction, c)
 		},
 
 		// Prints the number of words sent for a given channel, or if not specified for the entire server
-		"words": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"words": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
 			var (
 				mex         *sql.Rows
 				err         error
@@ -364,11 +364,11 @@ var (
 			toSend = fmt.Sprintf("Number of words: %d\n\n", cont) + toSend
 
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Words", toSend).
-				SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				SetColor(0x7289DA).MessageEmbed, i.Interaction, c)
 		},
 
 		// Prints the number of messages sent for a given channel, or if not specified for the entire server
-		"messages": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"messages": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
 			var (
 				mex         *sql.Rows
 				err         error
@@ -436,11 +436,11 @@ var (
 			toSend = fmt.Sprintf("Number of messages: %d\n\n", cont) + toSend
 
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Messages", toSend).
-				SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				SetColor(0x7289DA).MessageEmbed, i.Interaction, c)
 		},
 
 		// Prints stats for a given channel, or if not specified for the entire server.
-		"charspermex": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"charspermex": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
 			var (
 				mex         *sql.Rows
 				err         error
@@ -516,12 +516,12 @@ var (
 			toSend = fmt.Sprintf("Number of characters per message sent: %d\n\n", cont) + toSend
 
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Characters per message", toSend).
-				SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				SetColor(0x7289DA).MessageEmbed, i.Interaction, c)
 
 		},
 
 		// Generates a word cloud for a channel, or the entire server if omitted
-		"wordcloud": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"wordcloud": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
 			var (
 				mex         *sql.Rows
 				err         error
@@ -599,16 +599,20 @@ var (
 			// Encodes it
 			_ = png.Encode(&imgPng, img)
 
-			// Send it in a channel
-			_, err = s.ChannelFileSend(i.ChannelID, "wordcloud.png", &imgPng)
-			if err != nil {
-				lit.Error("Error while sending image " + err.Error())
-				return
-			}
-			// TODO: maybe do something about the interaction timing out
+			// Sends it
+			<-c
+			_, _ = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+				Files: []*discordgo.File{
+					{
+						Name:        "wordcloud.png",
+						ContentType: "image/png",
+						Reader:      &imgPng,
+					},
+				},
+			})
 		},
 
-		"undelete": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"undelete": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
 			var (
 				number      uint
 				m           discordgo.Message
@@ -664,10 +668,10 @@ var (
 			}
 
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Undelete", strings.TrimSuffix(toSend, "\n")+"```").
-				SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				SetColor(0x7289DA).MessageEmbed, i.Interaction, c)
 		},
 
-		"markov": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"markov": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
 			tokens := []string{gomarkov.StartToken}
 			for tokens[len(tokens)-1] != gomarkov.EndToken {
 				next, _ := server[i.GuildID].model.Generate(tokens[(len(tokens) - 1):])
@@ -675,17 +679,17 @@ var (
 			}
 
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Markov", strings.Join(tokens[1:len(tokens)-1], " ")).
-				SetColor(0x7289DA).MessageEmbed, i.Interaction)
+				SetColor(0x7289DA).MessageEmbed, i.Interaction, c)
 		},
 
-		"longest": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"longest": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
 			var (
 				rows                 *sql.Rows
 				data                 []byte
 				channelID, messageID string
 				m                    LightMessage
 				cont                 = 1
-				max                  int
+				highest              int
 				err                  error
 				embed                = NewEmbed().SetTitle(s.State.User.Username).SetColor(0x7289DA)
 			)
@@ -707,19 +711,19 @@ var (
 					_ = json.Unmarshal(data, &m)
 
 					if len(m.Content) < 100 {
-						max = len(m.Content)
+						highest = len(m.Content)
 					} else {
-						max = 100
+						highest = 100
 					}
 
-					embed.AddField(strconv.Itoa(cont), fmt.Sprintf("[%s](https://discord.com/channels/%s/%s/%s) - by %s\n", m.Content[0:max], i.GuildID, channelID, messageID, m.Author.Username))
+					embed.AddField(strconv.Itoa(cont), fmt.Sprintf("[%s](https://discord.com/channels/%s/%s/%s) - by %s\n", m.Content[0:highest], i.GuildID, channelID, messageID, m.Author.Username))
 					cont++
 				}
 			}
 
-			sendEmbedInteraction(s, embed.MessageEmbed, i.Interaction)
+			sendEmbedInteraction(s, embed.MessageEmbed, i.Interaction, c)
 		},
-		"poll": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"poll": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
 			var n int
 			question := i.ApplicationCommandData().Options[0].StringValue()
 			group := i.ApplicationCommandData().Options[1].StringValue()
@@ -728,7 +732,7 @@ var (
 			_ = db.QueryRow("SELECT COUNT(*) FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, group).Scan(&n)
 			if n == 0 {
 				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3, c)
 				return
 			}
 
@@ -746,46 +750,46 @@ var (
 			_ = s.MessageReactionAdd(msg.ChannelID, msg.ID, "👎")
 		},
 
-		"creategroup": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"creategroup": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
 			var n int
 			_ = db.QueryRow("SELECT COUNT(*) FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue()).Scan(&n)
 			if n == 0 {
 				_, _ = db.Exec("INSERT INTO pollsGroup (serverID, name, createdBy) VALUES (?, ?, ?)", i.GuildID, i.ApplicationCommandData().Options[0].StringValue(), i.Member.User.ID)
 				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group created!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3, c)
 			} else {
 				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group already exists!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3, c)
 			}
 		},
 
-		"deletegroup": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"deletegroup": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
 			var userID string
 			_ = db.QueryRow("SELECT createdBy FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue()).Scan(&userID)
 
 			if userID == "" {
 				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3, c)
 			}
 
 			if userID == i.Member.User.ID {
 				_, _ = db.Exec("DELETE FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue())
 				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group deleted!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3, c)
 			} else {
 				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3, c)
 			}
 		},
 
 		// Adds a member to a group. Only the creator of the group can add people
-		"addmember": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"addmember": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
 			var createdBy, userIDs string
 			_ = db.QueryRow("SELECT createdBy, userIDs FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue()).Scan(&createdBy, &userIDs)
 
 			if createdBy == "" {
 				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3, c)
 			}
 
 			if createdBy == i.Member.User.ID {
@@ -794,7 +798,7 @@ var (
 				// If the user is already in the group, just return
 				if strings.Contains(userIDs, user.ID) {
 					sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "User already in the group!").
-						SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+						SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3, c)
 					return
 				}
 
@@ -810,28 +814,28 @@ var (
 				// Adds the nickname to the database
 				_, _ = db.Exec("INSERT IGNORE INTO users (id, nickname) VALUES (?, ?)", user.ID, user.Username)
 
-				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Member added!").MessageEmbed, i.Interaction, time.Second*3)
+				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Member added!").MessageEmbed, i.Interaction, time.Second*3, c)
 			} else {
 				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3, c)
 			}
 		},
 
 		// Removes a member from a group. Only the creator of the group can remove people
-		"removemember": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"removemember": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
 			var createdBy, userIDs string
 			_ = db.QueryRow("SELECT createdBy, userIDs FROM pollsGroup WHERE serverID=? AND name=?", i.GuildID, i.ApplicationCommandData().Options[0].StringValue()).Scan(&createdBy, &userIDs)
 
 			if createdBy == "" {
 				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "Group not found!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3, c)
 			}
 
 			if createdBy == i.Member.User.ID {
 				// If the user is not in the group, just return
 				if !strings.Contains(userIDs, i.ApplicationCommandData().Options[1].UserValue(s).ID) {
 					sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "User not in the group!").
-						SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+						SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3, c)
 					return
 				}
 
@@ -842,7 +846,7 @@ var (
 
 			} else {
 				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
-					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3)
+					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3, c)
 			}
 		},
 	}

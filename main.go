@@ -96,7 +96,15 @@ func main() {
 		// Ignores commands from DM
 		if i.User == nil {
 			if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
-				h(s, i)
+				c := make(chan struct{})
+				go func() {
+					_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+						Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+					})
+					c <- struct{}{}
+				}()
+
+				h(s, i, c)
 			}
 		}
 	})

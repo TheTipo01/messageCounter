@@ -8,17 +8,17 @@ import (
 )
 
 // Sends embed as response to an interaction
-func sendEmbedInteraction(s *discordgo.Session, embed *discordgo.MessageEmbed, i *discordgo.Interaction) {
+func sendEmbedInteraction(s *discordgo.Session, embed *discordgo.MessageEmbed, i *discordgo.Interaction, c chan struct{}) {
 	sliceEmbed := []*discordgo.MessageEmbed{embed}
-	err := s.InteractionRespond(i, &discordgo.InteractionResponse{Type: discordgo.InteractionResponseChannelMessageWithSource, Data: &discordgo.InteractionResponseData{Embeds: sliceEmbed}})
+	_, err := s.InteractionResponseEdit(i, &discordgo.WebhookEdit{Embeds: &sliceEmbed})
 	if err != nil {
 		lit.Error("InteractionRespond failed: %s", err)
 	}
 }
 
 // Sends and delete after three second an embed in a given channel
-func sendAndDeleteEmbedInteraction(s *discordgo.Session, embed *discordgo.MessageEmbed, i *discordgo.Interaction, wait time.Duration) {
-	sendEmbedInteraction(s, embed, i)
+func sendAndDeleteEmbedInteraction(s *discordgo.Session, embed *discordgo.MessageEmbed, i *discordgo.Interaction, wait time.Duration, c chan struct{}) {
+	sendEmbedInteraction(s, embed, i, c)
 
 	time.Sleep(wait)
 
@@ -26,14 +26,6 @@ func sendAndDeleteEmbedInteraction(s *discordgo.Session, embed *discordgo.Messag
 	if err != nil {
 		lit.Error("InteractionResponseDelete failed: %s", err)
 		return
-	}
-}
-
-func sendEmbedInteractionFollowup(s *discordgo.Session, embed *discordgo.MessageEmbed, i *discordgo.Interaction) {
-	sliceEmbed := []*discordgo.MessageEmbed{embed}
-	_, err := s.FollowupMessageCreate(i, false, &discordgo.WebhookParams{Embeds: sliceEmbed})
-	if err != nil {
-		lit.Error("FollowupMessageCreate failed: %s", err)
 	}
 }
 

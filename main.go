@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // Config holds data parsed from the config.yml
@@ -63,6 +64,8 @@ func init() {
 		lit.Error("Error opening db connection, %s", err)
 		return
 	}
+
+	db.SetConnMaxLifetime(time.Minute * 3)
 
 	// Initialize tables
 	execQuery(tblMessages, tblUsers, tblServers, tblChannels, tblPings, tblConfig, tblPollState, tblPollsGroups)

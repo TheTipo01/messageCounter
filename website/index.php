@@ -27,8 +27,8 @@
 
         if ($result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
-                echo "<tr><td>".$row["menzionatore"]."</td>"."<td>".$row["menzionato"]."</td>"."<td>".$row["timestamp"]."</td>"
-                    ."<td>".$row["serverName"]."</td>"."<td>".$row["canale"]."</td>"."</tr>";
+                echo "<tr><td>".htmlspecialchars(strip_tags($row["menzionatore"]))."</td>"."<td>".htmlspecialchars(strip_tags($row["menzionato"]))."</td>"."<td>".htmlspecialchars(strip_tags($row["timestamp"]))."</td>"
+                    ."<td>".htmlspecialchars(strip_tags($row["serverName"]))."</td>"."<td>".htmlspecialchars(strip_tags($row["canale"]))."</td>"."</tr>";
             }
         }
         $connection->close();

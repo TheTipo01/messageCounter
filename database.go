@@ -253,7 +253,13 @@ func sendQuoteToServer(s *discordgo.Session, guildID, channelID, channelToID str
 		message.Content = message.Attachments[0].URL + "\n" + message.Content
 	}
 
-	_, err = s.ChannelMessageSend(channelToID, "Quote of the week:```\n"+message.Content+"```Submitted by "+message.Author.Username)
+	rows := strings.Split(message.Content, "\n")
+	quoted_msg := ""
+	for _, row := range rows {
+		quoted_msg += "> " + row
+	}
+
+	_, err = s.ChannelMessageSend(channelToID, "Quote of the week:\n"+quoted_msg+"\nSubmitted by "+message.Author.Username)
 	if err != nil {
 		lit.Error("Can't send message, %s", err)
 		return

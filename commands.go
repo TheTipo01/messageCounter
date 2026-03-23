@@ -4,18 +4,26 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
+	"image/color"
+	"image/png"
+	"math"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
+
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
 	"github.com/goccy/go-json"
 	"github.com/mb-14/gomarkov"
 	"github.com/psykhi/wordclouds"
-	"image/color"
-	"image/png"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
-	"unicode/utf8"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/plotutil"
+	"gonum.org/v1/plot/vg"
+	"gonum.org/v1/plot/vg/draw"
 )
 
 var (
@@ -214,6 +222,18 @@ var (
 					Name:        "member",
 					Description: "The member to remove",
 					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "plotmonthly",
+			Description: "Generates a plot of the messages per channel sent monthly",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "months",
+					Description: "Given months to go back",
+					Required:    false,
 				},
 			},
 		},
@@ -848,6 +868,218 @@ var (
 				sendAndDeleteEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Poll", "You are not the owner of this group!").
 					SetColor(0x7289DA).MessageEmbed, i.Interaction, time.Second*3, c)
 			}
+		},
+		"plotmonthly": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
+			var months int64
+			if len(i.ApplicationCommandData().Options) > 0 {
+				months = i.ApplicationCommandData().Options[0].IntValue()
+			} else {
+				months = 3
+			}
+			if months < 1 {
+				months = 1
+			}
+
+			now := time.Now().UTC()
+			currentMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+			startMonth := currentMonthStart.AddDate(0, -int(months)+1, 0)
+
+			monthKeys := make([]string, 0, months)
+			for t := startMonth; !t.After(currentMonthStart); t = t.AddDate(0, 1, 0) {
+				monthKeys = append(monthKeys, t.Format("2006-01"))
+			}
+
+			// counts[channelID][YYYY-MM] = total messages
+			counts := make(map[string]map[string]float64)
+			channelSet := make(map[string]struct{})
+
+			guildChannels, err := s.GuildChannels(i.GuildID)
+			if err != nil {
+				lit.Error("plotmonthly guild channels failed: %s", err)
+				sendEmbedInteraction(
+					s,
+					NewEmbed().SetTitle(s.State.User.Username).AddField("Plot monthly", "Error while getting server channels").SetColor(0x7289DA).MessageEmbed,
+					i.Interaction,
+					c,
+				)
+				return
+			}
+
+			activeTextChannelIDs := make([]string, 0, len(guildChannels))
+			channelNames := make(map[string]string, len(guildChannels))
+
+			for _, ch := range guildChannels {
+				// Keep only normal text channels; this excludes threads.
+				if ch.Type != discordgo.ChannelTypeGuildText {
+					continue
+				}
+				activeTextChannelIDs = append(activeTextChannelIDs, ch.ID)
+				channelNames[ch.ID] = ch.Name
+			}
+
+			if len(activeTextChannelIDs) == 0 {
+				sendEmbedInteraction(
+					s,
+					NewEmbed().SetTitle(s.State.User.Username).AddField("Plot monthly", "No active text channels found in this server").SetColor(0x7289DA).MessageEmbed,
+					i.Interaction,
+					c,
+				)
+				return
+			}
+
+			placeholders := strings.TrimRight(strings.Repeat("?,", len(activeTextChannelIDs)), ",")
+
+			query := fmt.Sprintf(`
+	SELECT channelID,
+	       DATE_FORMAT(ts, '%%Y-%%m') AS ym,
+	       COUNT(*) AS total
+	FROM (
+		SELECT channelID,
+		       STR_TO_DATE(
+		           REPLACE(SUBSTRING(JSON_VALUE(message, '$.timestamp'), 1, 19), 'T', ' '),
+		           '%%Y-%%m-%%d %%H:%%i:%%s'
+		       ) AS ts
+		FROM messages
+		WHERE guildID = ?
+		  AND channelID IN (%s)
+		  AND JSON_VALUE(message, '$.timestamp') IS NOT NULL
+	) t
+	WHERE ts >= ?
+	GROUP BY channelID, ym
+	ORDER BY ym ASC, channelID ASC
+`, placeholders)
+
+			args := make([]any, 0, 2+len(activeTextChannelIDs))
+			args = append(args, i.GuildID)
+			for _, id := range activeTextChannelIDs {
+				args = append(args, id)
+			}
+			args = append(args, startMonth)
+
+			rows, err := db.Query(query, args...)
+			defer rows.Close()
+
+			var channelID, ym string
+			var total int
+			for rows.Next() {
+				err = rows.Scan(&channelID, &ym, &total)
+				if err != nil {
+					continue
+				}
+
+				if _, ok := counts[channelID]; !ok {
+					counts[channelID] = make(map[string]float64)
+				}
+				counts[channelID][ym] = float64(total)
+				channelSet[channelID] = struct{}{}
+			}
+
+			if len(channelSet) == 0 {
+				sendEmbedInteraction(
+					s,
+					NewEmbed().SetTitle(s.State.User.Username).AddField("Plot monthly", "No data available for the given interval").SetColor(0x7289DA).MessageEmbed,
+					i.Interaction,
+					c,
+				)
+				return
+			}
+
+			p := plot.New()
+			p.Title.Text = "Monthly messages per channel"
+
+			p.X.Label.Text = "Month"
+			p.X.Tick.Label.Rotation = math.Pi / 2
+			p.X.Tick.Label.XAlign = draw.XRight
+			p.X.Tick.Label.YAlign = draw.YCenter
+
+			p.Y.Label.Text = "Number of messages"
+			p.Y.Min = 0
+
+			p.Add(plotter.NewGrid())
+			p.NominalX(monthKeys...)
+
+			channelIDs := make([]string, 0, len(channelSet))
+			for id := range channelSet {
+				channelIDs = append(channelIDs, id)
+			}
+			sort.Strings(channelIDs)
+
+			for idx, chID := range channelIDs {
+				pts := make(plotter.XYs, len(monthKeys))
+				for x, mk := range monthKeys {
+					pts[x].X = float64(x)
+					pts[x].Y = counts[chID][mk]
+				}
+
+				line, points, err := plotter.NewLinePoints(pts)
+				if err != nil {
+					lit.Error("plotmonthly line creation failed for channel %s: %s", chID, err)
+					continue
+				}
+
+				clr := plotutil.Color(idx)
+				line.Color = clr
+				points.Color = clr
+				line.Width = vg.Points(1.5)
+
+				label := chID
+				if ch, chErr := s.Channel(chID); chErr == nil && ch != nil && ch.Name != "" {
+					label = "#" + ch.Name
+				}
+
+				p.Add(line, points)
+				p.Legend.Add(label, line)
+			}
+
+			var img bytes.Buffer
+			plotWidthIn := 12.0 + 0.28*float64(len(monthKeys))
+			if plotWidthIn < 14 {
+				plotWidthIn = 14
+			}
+			if plotWidthIn > 42 {
+				plotWidthIn = 42
+			}
+
+			plotHeightIn := 7.0 + 0.10*float64(len(channelIDs))
+			if plotHeightIn < 7 {
+				plotHeightIn = 7
+			}
+			if plotHeightIn > 16 {
+				plotHeightIn = 16
+			}
+
+			writerTo, err := p.WriterTo(vg.Length(plotWidthIn)*vg.Inch, vg.Length(plotHeightIn)*vg.Inch, "png")
+			if err != nil {
+				lit.Error("plotmonthly writer creation failed: %s", err)
+				sendEmbedInteraction(
+					s,
+					NewEmbed().SetTitle(s.State.User.Username).AddField("Plot monthly", "Error while generating the graph").SetColor(0x7289DA).MessageEmbed,
+					i.Interaction,
+					c,
+				)
+				return
+			}
+			if _, err = writerTo.WriteTo(&img); err != nil {
+				lit.Error("plotmonthly png encoding failed: %s", err)
+				sendEmbedInteraction(
+					s,
+					NewEmbed().SetTitle(s.State.User.Username).AddField("Plot monthly", "Error while encoding the image").SetColor(0x7289DA).MessageEmbed,
+					i.Interaction,
+					c,
+				)
+				return
+			}
+
+			<-c
+			_, _ = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+				Files: []*discordgo.File{
+					{
+						Name:        "plotmonthly.png",
+						ContentType: "image/png",
+						Reader:      &img,
+					},
+				},
+			})
 		},
 	}
 )

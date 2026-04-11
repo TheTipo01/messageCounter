@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"image/png"
 	"math"
+	"math/rand"
 	"regexp"
 	"sort"
 	"strconv"
@@ -234,6 +235,18 @@ var (
 					Name:        "months",
 					Description: "Given months to go back",
 					Required:    false,
+				},
+			},
+		},
+		{
+			Name:        "8ball",
+			Description: "Gets a random answer to your question",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "question",
+					Description: "Your question",
+					Required:    true,
 				},
 			},
 		},
@@ -1080,6 +1093,17 @@ var (
 					},
 				},
 			})
+		},
+		"8ball": func(s *discordgo.Session, i *discordgo.InteractionCreate, c chan struct{}) {
+			sendEmbedInteraction(
+				s,
+				NewEmbed().SetTitle(s.State.User.Username).
+					AddField("Magic 8 Ball", i.ApplicationCommandData().Options[0].StringValue()).
+					AddField("Answer", answers[rand.Intn(len(answers))]).
+					SetColor(0x7289DA).MessageEmbed,
+				i.Interaction,
+				c,
+			)
 		},
 	}
 )

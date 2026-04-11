@@ -243,7 +243,7 @@ var (
 			Description: "Gets a random answer to your question",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
-					Type:        discordgo.ApplicationCommandOptionInteger,
+					Type:        discordgo.ApplicationCommandOptionString,
 					Name:        "question",
 					Description: "Your question",
 					Required:    true,
